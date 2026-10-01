@@ -12,8 +12,8 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 | 입력 | 최근 20일 (close, volume) | 과거 72h 이용률 + 내일 24h 기상(일사·운량·기온) + 태양고도 + 날짜 | `data/features.py`, `data/solar.py` |
 | 단위 | 달러 | 이용률 = kWh ÷ 설비용량 → 발전소 10곳을 한 모델로 | `data/plants.csv` |
 | 데이터 | 가상 시세 756행 | 실제 실적 10곳 × 3.7년 시간별(32만 행) + Open-Meteo 기상 | `data/sample_solar_hourly.csv.gz`, `data/weather/` |
-| 게이트 | RMSE ≤ $4 | **제도 오차율**: 테스트 1년 일 오차율 평균 ≤ 8% (+ 8%/6% 통과율 기록) | `train_and_register.py`, `data/metrics.py` |
-| 드리프트 | 오차 크면 재학습 | 오차율 + 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
+| 게이트 | RMSE ≤ $4 | **제도 오차율 8% 통과율**(일 오차율 ≤ 8%인 날의 비율): 첫 배포는 ≥ 0.45(기준선 0.30×1.5), 이후는 현 Production 이상(챔피언/챌린저). fine-tune은 같은 held-out 날짜에서 현 Production보다 평균 오차가 낮을 때만 | `train_and_register.py`, `data/metrics.py` |
+| 드리프트 | 오차 크면 재학습 | 21일 오차율 > 임계값(max(8%, 검증 오차×1.25)) 이면 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
 | 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포 | `monitoring/retrain_trigger.py` |
 | 재학습 데이터 | 업로드 파일 마지막 41행 | 업로드 + 운영 중 수신한 실적(`data/recent/`) → 드리프트를 일으킨 데이터로 재학습 | `data/storage.py` |
 | 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) | `scripts/simulate_drift.py`, `/data/window` |
@@ -55,6 +55,6 @@ cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 ## 완료 기준
 
 - [ ] `/data/upload` 로 시간별 실적을 올리면 `/data/status` 에 발전소 10곳·기간이 보이는가
-- [ ] Day2 게이트: 테스트 1년 일 오차율 평균 ≤ 8% 로 Production 승격되는가 (기상 없는 v1 과 수치 비교)
+- [ ] Day2 게이트: 테스트 1년 8% 통과율로 Production 승격되는가 (기준선 persistence 16.0% / GHI 선형 12.0% 대비 개선 수치)
 - [ ] 장마철·설비 고장 배치는 재학습 없이 `[WARN]`/`[ALERT]` 만 남고, 전 발전소 변화 배치만 `[INFO] retrain triggered` → `[OK]` 로 이어지는가
 - [ ] 재배포 후 `/predict` 의 `model_version` 이 `production-v2` 로 바뀌는가

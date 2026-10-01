@@ -21,7 +21,7 @@ FINE_TUNE_DAYS = 30
 
 
 def _fmt(c: dict) -> str:
-    return (f"plant={c['plant_id']}, err={c.get('window_error')}%, pr_recent={c.get('pr_recent')}, "
+    return (f"plant={c['plant_id']}, err={c.get('window_error')}% (thr {c.get('threshold')}%), pr_recent={c.get('pr_recent')}, "
             f"pr_before={c.get('pr_before')}, fleet_share={c.get('fleet_share')}")
 
 

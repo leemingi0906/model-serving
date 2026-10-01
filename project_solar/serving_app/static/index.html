@@ -211,7 +211,7 @@ let lastPipelineRun = null; // { driftCheck, clientRmse, ts }
 const PIPELINE_STAGES = [
   { key: "collect", title: "데이터 수집", desc: "요청 수신" },
   { key: "monitor", title: "데이터 모니터링", desc: "예측 기록 누적" },
-  { key: "detect", title: "드리프트 감지", desc: "오차율 vs 8%" },
+  { key: "detect", title: "드리프트 감지", desc: "21일 오차율 vs 임계값" },
   { key: "classify", title: "원인 분류", desc: "PR · 발전소 동시성" },
   { key: "trigger", title: "재학습 트리거", desc: "model_drift 일 때만" },
   { key: "train", title: "모델 학습", desc: "fine-tuning" },
@@ -228,7 +228,7 @@ const BATCHES = {
   fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "gwangyang_1", "yeongheung_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
 };
 const STATUS_LABEL = {
-  ok: "정상 (오차율 ≤ 8%)", insufficient: "판단 보류 (기록 7일 미만)",
+  ok: "정상 (21일 오차율 ≤ 임계값)", insufficient: "판단 보류 (기록 7일 미만)",
   weather: "날씨·예보 오차 (PR 정상) → 알림만, 재학습 안 함",
   equipment: "설비 이상 의심 (PR 급락) → 운영자 알림, 재학습 금지",
   soiling: "오염 의심 (PR 완만 하락) → 세척 알림, 재학습 안 함",
@@ -387,7 +387,7 @@ async function sendBatch(kind) {
     }
     statusEl.innerHTML = `
       <span class="pill ${level}"><span class="dot"></span>${label}</span>
-      <span class="pill neutral" style="margin-left:6px;">${data.plant_id} · ${win.data.start} ~ ${win.data.end} · 일 오차율 평균 ${s.mean_error}% · 8% 통과율 ${s.pass_rate_8} · PR ${s.pr_mean} · 창(21일) 오차 ${check.window_error ?? "-"}%</span>`;
+      <span class="pill neutral" style="margin-left:6px;">${data.plant_id} · ${win.data.start} ~ ${win.data.end} · 일 오차율 평균 ${s.mean_error}% · 8% 통과율 ${s.pass_rate_8} · PR ${s.pr_mean} · 창(21일) 오차 ${check.window_error ?? "-"}% / 임계값 ${check.threshold ?? "-"}%</span>`;
     showResult(resultBox, batch.runs.length > 1 ? all : data, false);
   } catch (e) {
     statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>연결 실패</span>`;

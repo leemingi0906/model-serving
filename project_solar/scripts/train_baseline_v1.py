@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from data.features import SolarScaler, build_dataset, split_by_date
 from serving_app.lstm_model import build_model
-from serving_app.train_and_register import load_training_sources, evaluate, TEST_SPLIT, BASE_EPOCHS, GATE_MEAN_ERROR
+from serving_app.train_and_register import load_training_sources, evaluate, TEST_SPLIT, BASE_EPOCHS, GATE_MIN_PASS_RATE
 
 MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"
@@ -37,10 +37,11 @@ def main():
     print(f"samples: train {len(tr)} / test {len(te)}  (plants {len(gen)})")
 
     model = build_model()
-    model.fit([Xh[tr], Xf[tr], Xd[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0)
+    es = keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
+    model.fit([Xh[tr], Xf[tr], Xd[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0, validation_split=0.1, callbacks=[es])
     m = evaluate(model, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants)
     print(f"baseline v2: mean_error={m['mean_error']}%  pass_rate_8={m['pass_rate_8']}  pass_rate_6={m['pass_rate_6']}  "
-          f"rmse_cf={m['rmse_cf']}  (배포 게이트: 평균 {GATE_MEAN_ERROR:.0f}%)")
+          f"rmse_cf={m['rmse_cf']}  (배포 게이트: pass_rate_8 >= {GATE_MIN_PASS_RATE})")
     model.save(MODEL_PATH)
     print(f"saved -> {MODEL_PATH}")
 
