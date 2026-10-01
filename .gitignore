@@ -27,3 +27,6 @@ team_solar/experiments/*.keras
 
 # 승격 시 생성되는 운영 메타 (런타임 산출물)
 project*/serving_app/models/production_metrics.json
+
+# 운영 중 수신 실적 (배치 테스트가 저장, 런타임 산출물)
+project*/data/recent/
