@@ -14,7 +14,7 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 | 데이터 | 가상 시세 756행 | 실제 실적 10곳 × 3.7년 시간별(32만 행) + Open-Meteo 기상 | `data/sample_solar_hourly.csv.gz`, `data/weather/` |
 | 게이트 | RMSE ≤ $4 | **제도 오차율 8% 통과율**(일 오차율 ≤ 8%인 날의 비율): 첫 배포는 ≥ 0.45(기준선 0.30×1.5), 이후는 현 Production 이상(챔피언/챌린저). fine-tune은 같은 held-out 날짜에서 현 Production보다 평균 오차가 낮을 때만 | `train_and_register.py`, `data/metrics.py` |
 | 드리프트 | 오차 크면 재학습 | 21일 오차율 > 임계값(max(8%, 검증 오차×1.25)) 이면 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
-| 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포 | `monitoring/retrain_trigger.py` |
+| 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포. 같은 시기에 PR < 0.75 인 발전소는 동시성에 묶여도 fine-tune 데이터에서 제외(고장을 정상으로 학습 방지) | `monitoring/retrain_trigger.py` |
 | 재학습 데이터 | 업로드 파일 마지막 41행 | 업로드 + 운영 중 수신한 실적(`data/recent/`) → 드리프트를 일으킨 데이터로 재학습 | `data/storage.py` |
 | 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) | `scripts/simulate_drift.py`, `/data/window` |
 

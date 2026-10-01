@@ -13,7 +13,7 @@ logs/aiops.log 에 남는 줄 (대시보드가 읽으므로 앞머리 토큰은 
 import logging
 from datetime import date, timedelta
 
-from serving_app.monitoring.drift_detector import classify, records
+from serving_app.monitoring.drift_detector import PR_EQUIPMENT, classify, records
 
 logger = logging.getLogger("aiops")
 
@@ -52,9 +52,21 @@ def check_and_trigger(plant_id: str) -> dict:
     last_day = max(r["date"] for r in records[plant_id])
     end = date.fromisoformat(last_day)
     start = end - timedelta(days=FINE_TUNE_DAYS - 1)
-    # 재학습 대상: 오차가 큰 발전소 전부 (한 발전소만 보고 전체 모델을 고치지 않는다)
-    affected = sorted({plant_id} | {pid for pid in records if classify(pid)["status"] in ("model_drift", "weather")})
-    logger.info(f"[INFO] retrain triggered (window=last_{FINE_TUNE_DAYS}_days, plants={','.join(affected)})")
+    # 재학습 대상: 오차가 큰 발전소 전부 (한 발전소만 보고 전체 모델을 고치지 않는다).
+    # 단, 같은 시기에 PR 이 설비 이상 범위(< 0.75)인 발전소는 동시성 때문에 model_drift 로 묶여도 제외한다.
+    # 고장 난 발전소 실적으로 fine-tune 하면 고장을 정상으로 학습하기 때문.
+    affected, excluded = {plant_id}, []
+    for pid in records:
+        c2 = classify(pid)
+        if c2["status"] not in ("model_drift", "weather"):
+            continue
+        if c2.get("pr_recent") is not None and c2["pr_recent"] < PR_EQUIPMENT:
+            excluded.append(f"{pid}(PR {c2['pr_recent']})")
+        else:
+            affected.add(pid)
+    affected = sorted(affected)
+    logger.info(f"[INFO] retrain triggered (window=last_{FINE_TUNE_DAYS}_days, plants={','.join(affected)})"
+                + (f" - excluded low-PR plants: {', '.join(excluded)}" if excluded else ""))
 
     result = fine_tune(affected, start.isoformat(), end.isoformat())
     c["retrain"] = result
