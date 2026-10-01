@@ -1,0 +1,5 @@
+2026-10-01 08:17:20,591 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=1.0)
+2026-10-01 08:17:20,591 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
+2026-10-01 08:17:28,182 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=gyeongsang_1, err=14.22% (thr 10.36%), pr_recent=1.206, pr_before=1.199, fleet_share=1.0)
+2026-10-01 08:17:28,190 [INFO] [INFO] retrain triggered (window=last_30_days, plants=gyeongsang_1,samcheonpo_2,samcheonpo_3)
+2026-10-01 08:17:49,802 [INFO] [OK] new_error=10.41% - production promoted: SolarCast_Hourly v2

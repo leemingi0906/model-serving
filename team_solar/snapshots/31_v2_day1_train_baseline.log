@@ -1,0 +1,12 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790841639.127613   16631 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790841639.127969   16631 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790841641.673504   16631 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790841641.674015   16631 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+scaler(정규화 상수) -> serving_app/models/scaler.pkl
+samples: train 9706 / test 3640  (plants 10)
+E0000 00:00:1790841653.087260   16631 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+baseline v2: mean_error=8.29%  pass_rate_8=0.579  pass_rate_6=0.389  rmse_cf=0.0807  (배포 게이트: pass_rate_8 >= 0.45)
+saved -> serving_app/models/solarcast_v2.keras
+EXIT=0

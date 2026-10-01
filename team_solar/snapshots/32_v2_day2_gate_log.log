@@ -1,0 +1,10 @@
+samples: train 9706 / test 3640  (plants 10, split 2025-09-01)
+2026/10/01 08:07:49 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/10/01 08:07:49 INFO mlflow.store.db.utils: Updating database tables
+2026/10/01 08:10:45 WARNING mlflow.tensorflow: You are saving a TensorFlow Core model or Keras model without a signature. Inference with mlflow.pyfunc.spark_udf() will not work unless the model's pyfunc representation accepts pandas DataFrames as inference inputs.
+base-train: {'n_days': 3534, 'mean_error': 8.29, 'pass_rate_8': 0.579, 'pass_rate_6': 0.389, 'rmse_cf': 0.0807}
+Successfully registered model 'SolarCast_Hourly'.
+2026/10/01 08:10:59 WARNING mlflow.tracking._model_registry.fluent: Run with id da39801c44664910850d909816c4163b has no artifacts at artifact path 'model', registering model based on models:/m-71647752cc9f4c2f8e25531b1cc6f633 instead
+Created version '1' of model 'SolarCast_Hourly'.
+[GATE PASSED] pass_rate_8=0.579 >= 0.45 (첫 배포 하한, mean_error=8.29%) -> SolarCast_Hourly v1 promoted to Production
+EXIT=0

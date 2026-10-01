@@ -1,0 +1,5 @@
+# 요청: samcheonpo_2, D=2026-08-30, 이력 72h + D-1 예보 24h (실제 총 2,948 kWh)
+# Day1 local v2       : total 3649.7 kWh, model_version v2-local
+# Day2 mlflow v1      : total 3649.7 kWh, model_version production-v1
+# Day3 재학습 후 v2    : total 3960.9 kWh, model_version production-v2 (x1.25 세계로 적응)
+# 시간별(Day2 v1): [0,0,0,0,0,0,1,108,211,334,432,519,534,461,407,336,212,94,0,0,0,0,0,0]
