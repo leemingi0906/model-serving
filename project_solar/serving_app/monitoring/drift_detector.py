@@ -81,9 +81,19 @@ def fleet_share_over_threshold(ref_date: str | None = None) -> tuple[float, int,
         if ref_date and abs(_days_between(w[-1]["date"], ref_date)) > FLEET_DATE_TOLERANCE:
             continue
         n += 1
-        if compute_window_error(pid) > error_threshold():
+        if compute_window_error(pid) > error_threshold() and not _abrupt_fault(w):
             over += 1
     return (over / n if n else 0.0), n, over
+
+
+def _abrupt_fault(w: list[dict]) -> bool:
+    """창 안에서 PR 이 정상에서 설비 이상 범위로 급락한 발전소 = 고장 신호. 동시 변화(모델 드리프트) 집계에서 뺀다.
+    (고장 난 발전소 둘이 같은 시기에 있다고 '세상이 바뀐 것'은 아니다.) 폭염처럼 창 전체가 완만히 낮은 경우는 급락이 아니라 집계에 들어간다."""
+    prs = [r["pr"] for r in w if r["pr"] is not None]
+    if len(prs) <= PR_RECENT_DAYS + 2:
+        return False
+    recent, before = _mean(prs[-PR_RECENT_DAYS:]), _mean(prs[:-PR_RECENT_DAYS])
+    return recent is not None and before is not None and recent < PR_EQUIPMENT and before - recent >= PR_EQUIPMENT_DROP
 
 
 def _days_between(a: str, b: str) -> int:
@@ -137,7 +147,8 @@ def classify(plant_id: str) -> dict:
 
     drop = (pr_before - pr_recent) if (pr_before is not None and pr_recent is not None) else None
     # 1) 같은 시기 여러 발전소가 동시에 틀리거나, 실제가 기대치를 계속 크게 웃돌면 -> 모델이 세상을 못 따라가는 것
-    # 동시 변화 = 같은 시기 발전소 중 절반 이상, 그리고 이 발전소 말고도 최소 한 곳 더 (2곳뿐일 때 한 곳만 틀린 것을 동시로 보지 않음)
+    # 동시 변화 = 같은 시기 발전소 중 절반 이상, 그리고 이 발전소 말고도 최소 한 곳 더 (2곳뿐일 때 한 곳만 틀린 것을 동시로 보지 않음).
+    # 창 안에서 급락한(고장 신호) 발전소는 집계에서 빠지므로, 고장 둘이 겹쳐도 모델 드리프트가 되지 않는다.
     if (n_over >= 2 and share >= FLEET_SHARE) or (pr_window is not None and pr_window > PR_FLEET_HIGH):
         out.update(status="model_drift", action="retrain")
     # 2) 장기 기록이 있고 PR 이 수개월에 걸쳐 단조 하락 -> 오염·열화·점진적 설비 손실 (재학습 금지)

@@ -98,6 +98,14 @@ def test_model_drift_when_actual_exceeds_expectation_for_one_plant():
     assert dd.classify("a")["status"] == "model_drift"
 
 
+def test_two_abrupt_faults_in_same_window_are_not_model_drift():
+    # 대시보드에서 합성 고장(삼천포2 x0.5) 뒤에 실제 영흥#5 를 눌렀을 때 생겼던 오판: 고장 둘이 겹쳐도 "동시 변화" 가 아니다
+    _fill("sc2", [7.0] * 7 + [16.0] * 14, [1.0] * 7 + [0.46] * 14)   # 창 안 급락 (고장 신호)
+    _fill("yh5", [11.7] * 21, [0.66] * 21)                           # 창 전체가 낮음
+    assert dd.classify("yh5")["status"] == "equipment"
+    assert dd.classify("sc2")["status"] == "equipment"
+
+
 def test_retrain_excludes_low_pr_plant_unless_majority():
     for pid in ("a", "b", "c"):
         _fill(pid, [13.0] * 21, [1.2] * 21)
