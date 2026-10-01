@@ -225,7 +225,7 @@ const BATCHES = {
   normal:      { label: "정상 (삼천포2 최근 21일)",   runs: [{ plant: "samcheonpo_2", query: "", persist: true }] },
   monsoon:     { label: "장마철 (2026-06-20~)",       runs: [{ plant: "samcheonpo_2", query: "&start=2026-06-20", persist: false }] },
   equipment:   { label: "설비 고장 (8일째부터 ×0.5)", runs: [{ plant: "samcheonpo_2", query: "&scale=0.5&scale_from_day=7", persist: false }] },
-  fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "gwangyang_1", "yeongheung_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
+  fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
 };
 const STATUS_LABEL = {
   ok: "정상 (21일 오차율 ≤ 임계값)", insufficient: "판단 보류 (기록 7일 미만)",
@@ -354,14 +354,14 @@ async function sendBatch(kind) {
   try {
     let data = null, win = null;
     const all = [];
-    for (const run of batch.runs) {
+    for (const [ri, run] of batch.runs.entries()) {
       win = await getJSON(`/data/window?plant_id=${run.plant}&n_days=${WINDOW_DAYS}${run.query}`);
       if (!win.ok) {
         statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${(win.data && win.data.detail) || "실적 데이터를 먼저 업로드하세요"}</span>`;
         return;
       }
       const res = await fetch("/predict/batch-test", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plant_id: run.plant, label: kind, records: win.data.records, persist: run.persist }) });
+        body: JSON.stringify({ plant_id: run.plant, label: kind, records: win.data.records, persist: run.persist, reset_state: true, check: ri === batch.runs.length - 1 }) });
       data = await safeJson(res);
       if (!res.ok) {
         statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>서버 오류 (${res.status})</span>`;

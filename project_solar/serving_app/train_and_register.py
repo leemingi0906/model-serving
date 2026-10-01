@@ -78,9 +78,24 @@ def load_production_model():
 
 
 def _save_production_metrics(version, metrics: dict, mode: str):
+    """
+    scratch  : 테스트 1년 검증값을 그대로 기록 -> 드리프트 임계값(mean_error x 1.25)의 기준
+    fine-tune: 최근 30일 held-out(며칠)로 잰 값은 임계값 기준으로 쓰기엔 표본이 작으므로, base 검증값은 유지하고
+               finetune_* 로 따로 남긴다.
+    """
     import json
 
-    payload = {"version": str(version), "mode": mode, "split": TEST_SPLIT, **{k: v for k, v in metrics.items()}}
+    prev = {}
+    try:
+        with open(PRODUCTION_METRICS_PATH, encoding="utf-8") as f:
+            prev = json.load(f)
+    except (OSError, ValueError):
+        pass
+    if mode == "scratch" or "mean_error" not in prev:
+        payload = {"version": str(version), "mode": mode, "split": TEST_SPLIT, **metrics}
+    else:
+        payload = {**prev, "version": str(version), "mode": mode,
+                   **{f"finetune_{k}": v for k, v in metrics.items()}}
     with open(PRODUCTION_METRICS_PATH, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=1)
 

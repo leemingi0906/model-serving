@@ -69,6 +69,8 @@ def batch_test(req: BatchTestRequest):
     wloc = weather_obs().get(plant["loc"], {})
     cap = plant["capacity_kw"]
 
+    if req.reset_state:
+        records[req.plant_id].clear()
     gen = {r.time: r.generation_kwh for r in req.records}
     days = sorted({t[:10] for t in gen})
     results: list[DayResult] = []
@@ -106,7 +108,13 @@ def batch_test(req: BatchTestRequest):
 
     summary = summarize([r.day_error for r in results])
     summary["pr_mean"] = round(sum(r.pr for r in results if r.pr is not None) / max(1, sum(1 for r in results if r.pr is not None)), 3)
-    drift_check = check_and_trigger(req.plant_id)
+    if req.check:
+        drift_check = check_and_trigger(req.plant_id)
+    else:  # 판정 보류: 분류 결과만 미리보기로 돌려주고 로그·재학습은 하지 않는다
+        from serving_app.monitoring.drift_detector import classify
+
+        drift_check = classify(req.plant_id)
+        drift_check["deferred"] = True
     drift_check["label"] = req.label
     return BatchTestResponse(plant_id=req.plant_id, label=req.label, days=results, summary=summary, drift_check=drift_check)
 

@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASE = os.getenv("API_BASE", "http://localhost:8010")
 N_DAYS = 21
 MONSOON_START = "2026-06-20"
-FLEET = ["samcheonpo_2", "gwangyang_1", "yeongheung_1"]
+FLEET = ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1"]  # 경남 3곳: "같은 지역 발전소 동시 변화"
 
 
 def fetch_window(plant_id, **params):
@@ -30,9 +30,10 @@ def fetch_window(plant_id, **params):
     return r.json()
 
 
-def send(plant_id, label, records, persist=True):
+def send(plant_id, label, records, persist=True, reset_state=True, check=True):
     r = requests.post(f"{BASE}/predict/batch-test",
-                      json={"plant_id": plant_id, "label": label, "records": records, "persist": persist}, timeout=1800)
+                      json={"plant_id": plant_id, "label": label, "records": records, "persist": persist,
+                            "reset_state": reset_state, "check": check}, timeout=1800)
     r.raise_for_status()
     res = r.json()
     s, d = res["summary"], res["drift_check"]
@@ -65,9 +66,9 @@ def main():
 
     if "fleet_shift" in run:
         print(f"[4] 전 발전소 변화(x1.25): {', '.join(FLEET)}")
-        for pid in FLEET:
+        for i, pid in enumerate(FLEET):  # 3곳 기록을 모두 쌓은 뒤 마지막에 한 번 판정 (동시성 판단)
             w = fetch_window(pid, scale=1.25)
-            send(pid, "fleet_shift", w["records"])
+            send(pid, "fleet_shift", w["records"], check=(i == len(FLEET) - 1))
 
     print("[5] logs/aiops.log 와 /predict/drift-state 를 확인하세요.")
 

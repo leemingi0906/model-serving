@@ -53,7 +53,7 @@ def check_and_trigger(plant_id: str) -> dict:
     end = date.fromisoformat(last_day)
     start = end - timedelta(days=FINE_TUNE_DAYS - 1)
     # 재학습 대상: 오차가 큰 발전소 전부 (한 발전소만 보고 전체 모델을 고치지 않는다)
-    affected = [pid for pid in records if classify(pid)["status"] == "model_drift"] or [plant_id]
+    affected = sorted({plant_id} | {pid for pid in records if classify(pid)["status"] in ("model_drift", "weather")})
     logger.info(f"[INFO] retrain triggered (window=last_{FINE_TUNE_DAYS}_days, plants={','.join(affected)})")
 
     result = fine_tune(affected, start.isoformat(), end.isoformat())

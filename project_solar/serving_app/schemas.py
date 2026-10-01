@@ -47,6 +47,8 @@ class BatchTestRequest(BaseModel):
     label: str = Field("batch", description="normal / monsoon / equipment / fleet_shift 등 로그 식별용")
     records: list[HourRecord] = Field(..., min_length=HIST_HOURS + HORIZON)
     persist: bool = Field(True, description="True 면 실적으로 저장 -> 재학습 데이터에 반영")
+    reset_state: bool = Field(False, description="True 면 이 발전소의 드리프트 기록을 비우고 시작 (시나리오를 독립적으로 재현할 때)")
+    check: bool = Field(True, description="False 면 기록만 쌓고 판정·대응은 하지 않음 (여러 발전소 배치를 모은 뒤 마지막에 한 번 판정)")
 
 
 class DayResult(BaseModel):

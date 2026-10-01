@@ -93,9 +93,11 @@ def classify(plant_id: str) -> dict:
     prs = [r["pr"] for r in w if r["pr"] is not None]
     pr_recent = _mean(prs[-PR_RECENT_DAYS:]) if prs else None
     pr_before = _mean(prs[:-PR_RECENT_DAYS]) if len(prs) > PR_RECENT_DAYS + 2 else None
+    pr_window = _mean(prs) if prs else None
     share, n_plants = fleet_share_over_threshold()
     thr = error_threshold()
     out.update(window_error=round(err, 2), threshold=thr, pr_recent=None if pr_recent is None else round(pr_recent, 3),
+               pr_window=None if pr_window is None else round(pr_window, 3),
                pr_before=None if pr_before is None else round(pr_before, 3), fleet_share=round(share, 2),
                fleet_plants=n_plants)
 
@@ -108,7 +110,7 @@ def classify(plant_id: str) -> dict:
         out.update(status="equipment", action="alert")
     elif pr_recent is not None and pr_recent < PR_SOILING and drop is not None and drop >= PR_SOILING_DROP:
         out.update(status="soiling", action="alert")
-    elif (n_plants >= 2 and share >= FLEET_SHARE) or (pr_recent is not None and pr_recent > PR_FLEET_HIGH):
+    elif (n_plants >= 2 and share >= FLEET_SHARE) or (pr_window is not None and pr_window > PR_FLEET_HIGH):
         out.update(status="model_drift", action="retrain")
     else:
         out.update(status="weather", action="alert")
