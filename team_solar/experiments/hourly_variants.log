@@ -1,0 +1,12 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790836654.545260    2009 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790836654.545657    2009 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790836656.718306    2009 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790836656.718773    2009 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026/10/01 06:37:39 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /usr/local/lib/python3.11/dist-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+samples 9706 3640
+persist  {'n_days': 3534, 'mean_error': 16.0, 'pass_rate_8': 0.3, 'pass_rate_6': 0.211}
+ghi_lin  {'n_days': 3534, 'mean_error': 11.96, 'pass_rate_8': 0.296, 'pass_rate_6': 0.159}
+E0000 00:00:1790836672.287362    2009 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+base {'n_days': 3534, 'mean_error': 8.98, 'pass_rate_8': 0.51, 'pass_rate_6': 0.317, 'epochs_run': 40, 'minutes': 5.9}

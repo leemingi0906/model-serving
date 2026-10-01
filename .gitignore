@@ -21,3 +21,6 @@ team_solar/data_raw/ck.txt
 
 # 원본 HTML 덤프
 team_solar/data_raw/*.html
+
+# 실험 중간 산출물 (모델 파일)
+team_solar/experiments/*.keras
