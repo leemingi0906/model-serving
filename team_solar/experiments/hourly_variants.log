@@ -12,3 +12,6 @@ E0000 00:00:1790836672.287362    2009 cuda_platform.cc:52] failed call to cuInit
 base {'n_days': 3534, 'mean_error': 8.98, 'pass_rate_8': 0.51, 'pass_rate_6': 0.317, 'epochs_run': 40, 'minutes': 5.9}
 long {'n_days': 3534, 'mean_error': 8.94, 'pass_rate_8': 0.51, 'pass_rate_6': 0.33, 'epochs_run': 70, 'minutes': 9.9}
 feat {'n_days': 3534, 'mean_error': 8.92, 'pass_rate_8': 0.505, 'pass_rate_6': 0.319, 'epochs_run': 64, 'minutes': 9.1}
+feat_mae {'n_days': 3534, 'mean_error': 8.84, 'pass_rate_8': 0.531, 'pass_rate_6': 0.35, 'epochs_run': 89, 'minutes': 13.1}
+-> team_solar/experiments/hourly_variants_results.json
+EXIT=0
