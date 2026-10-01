@@ -154,7 +154,7 @@ def train_and_register() -> dict:
         mlflow.log_param("n_test", len(te))
         mlflow.log_param("plants", ",".join(sorted(gen)))
         _log_metrics("test_", m)
-        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1], Xp[:1]])
+        mlflow.tensorflow.log_model(model, name="model")  # 다중 입력 텐서 예시는 MLflow 가 거부하므로 생략
         print(f"base-train: {m}")
         return _register_if_gate_passed(mlflow.active_run().info.run_id, m, champion_m)
 
@@ -188,7 +188,7 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
         mlflow.log_param("n_train", len(tr))
         _log_metrics("test_", m)
         _log_metrics("champion_", champion_m)
-        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1], Xp[:1]])
+        mlflow.tensorflow.log_model(model, name="model")  # 다중 입력 텐서 예시는 MLflow 가 거부하므로 생략
         print(f"fine-tune: {m}  (current Production on same days: {champion_m})")
         return _register_finetune_if_better(mlflow.active_run().info.run_id, m, champion_m)
 
