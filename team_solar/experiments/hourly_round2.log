@@ -1,0 +1,16 @@
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790839003.379474    8886 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790839003.379826    8886 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1790839005.699681    8886 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1790839005.700448    8886 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026/10/01 07:16:49 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /usr/local/lib/python3.11/dist-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+samples 9706 3640 plants 10
+E0000 00:00:1790839017.704544    8886 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+emb {'n_days': 3534, 'mean_error': 8.85, 'pass_rate_8': 0.528, 'pass_rate_6': 0.335, 'epochs_run': [61], 'minutes': 8.9}
+wloss {'n_days': 3534, 'mean_error': 8.33, 'pass_rate_8': 0.566, 'pass_rate_6': 0.375, 'epochs_run': [53], 'minutes': 7.8}
+emb_wloss {'n_days': 3534, 'mean_error': 7.99, 'pass_rate_8': 0.596, 'pass_rate_6': 0.42, 'epochs_run': [69], 'minutes': 10.1}
+emb_wloss_wide {'n_days': 3534, 'mean_error': 8.0, 'pass_rate_8': 0.602, 'pass_rate_6': 0.424, 'epochs_run': [30], 'minutes': 4.9}
+ens3 {'n_days': 3534, 'mean_error': 8.66, 'pass_rate_8': 0.527, 'pass_rate_6': 0.364, 'epochs_run': [12, 50, 11], 'minutes': 10.5}
+-> team_solar/experiments/hourly_round2_results.json
+EXIT=0

@@ -1,0 +1,54 @@
+{
+ "emb": {
+  "n_days": 3534,
+  "mean_error": 8.85,
+  "pass_rate_8": 0.528,
+  "pass_rate_6": 0.335,
+  "epochs_run": [
+   61
+  ],
+  "minutes": 8.9
+ },
+ "wloss": {
+  "n_days": 3534,
+  "mean_error": 8.33,
+  "pass_rate_8": 0.566,
+  "pass_rate_6": 0.375,
+  "epochs_run": [
+   53
+  ],
+  "minutes": 7.8
+ },
+ "emb_wloss": {
+  "n_days": 3534,
+  "mean_error": 7.99,
+  "pass_rate_8": 0.596,
+  "pass_rate_6": 0.42,
+  "epochs_run": [
+   69
+  ],
+  "minutes": 10.1
+ },
+ "emb_wloss_wide": {
+  "n_days": 3534,
+  "mean_error": 8.0,
+  "pass_rate_8": 0.602,
+  "pass_rate_6": 0.424,
+  "epochs_run": [
+   30
+  ],
+  "minutes": 4.9
+ },
+ "ens3": {
+  "n_days": 3534,
+  "mean_error": 8.66,
+  "pass_rate_8": 0.527,
+  "pass_rate_6": 0.364,
+  "epochs_run": [
+   12,
+   50,
+   11
+  ],
+  "minutes": 10.5
+ }
+}
