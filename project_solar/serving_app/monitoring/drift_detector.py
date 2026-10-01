@@ -1,31 +1,99 @@
 """
-[Day3] 드리프트 감지 - serving_app/monitoring/drift_detector.py (SolarCast)
+[Day3] 드리프트 감지 + 원인 분류 - serving_app/monitoring/drift_detector.py (SolarCast v2)
 
-"최근 모델이 설비용량 대비 몇 % 씩 틀리고 있는지(nRMSE)"를 계산해서,
-8% 보다 많이 틀리면 "데이터가 달라졌다(드리프트)"고 판단합니다.
+HAIC 실습은 "오차 크면 드리프트 -> 재학습" 한 가지였다. v2 는 두 지표를 같이 본다.
+    오차율  : 모델이 틀리고 있나          (최근 21일 일 오차율 평균 > 8%)
+    성능비 PR: 발전소가 이상한가          (실제 / 기상 기대치, 1.0 이 정상)
+그리고 "한 발전소만인가, 여러 발전소가 같이인가"를 가린다.
 
-판단 기준
-   최근 21일(WINDOW_SIZE)의 nRMSE > 8%  -> 드리프트
-   · 8%  = 발전량 예측제도의 정산금 지급 기준 오차율. 이보다 틀리면 정산금이 0 이 되므로
-           "서비스가 돈을 못 벌기 시작하는 선"을 그대로 알람 기준으로 씁니다.
-   · 21일 = 기상 변동(며칠 흐림)은 걸러내고, 계절 전환·설비 변화는 3주 안에 잡는 길이.
+판정표 (기획안 "드리프트 원인 분류와 대응")
+    오차 <= 8%                                         -> ok          (대응 없음)
+    오차 > 8%, PR 급락(최근 7일 < 0.75, 이전 대비 -0.2) -> equipment   (알림, 재학습 금지)
+    오차 > 8%, PR 완만 하락(0.75~0.92, 이전 대비 -0.05~) -> soiling     (세척 알림, 재학습 안 함)
+    오차 > 8%, 여러 발전소 동시 또는 PR 이 1.15 초과   -> model_drift (최근 30일 fine-tuning -> 게이트 -> 재배포)
+    오차 > 8%, PR 정상, 이 발전소만                   -> weather     (예보 오차 알림, 재학습 안 함)
 """
-from data.features import nrmse
+from collections import defaultdict
 
-NRMSE_THRESHOLD = 8.0  # %  (설비용량 대비)
-WINDOW_SIZE = 21       # 최근 21일
+from data.metrics import ERROR_THRESHOLD
+
+WINDOW_DAYS = 21        # 드리프트 판정 창
+PR_RECENT_DAYS = 7      # PR "최근" 구간
+PR_EQUIPMENT = 0.75     # 이 아래면 설비 이상 의심
+PR_EQUIPMENT_DROP = 0.20
+PR_SOILING = 0.92
+PR_SOILING_DROP = 0.05
+PR_FLEET_HIGH = 1.15    # 실제가 기대치보다 계속 많으면 모델이 세상을 못 따라가는 것 (용량 증설·효율 개선·계절)
+MIN_DAYS = 7            # 이보다 적으면 판단 보류
+FLEET_SHARE = 0.5       # 전체 발전소 중 이 비율 이상이 동시에 오차 초과면 모델 드리프트
+
+# 발전소별 일 단위 기록: {plant_id: [{"date", "day_error", "pr"}, ...]}  (predict.py 가 채운다)
+records: dict[str, list[dict]] = defaultdict(list)
 
 
-def compute_nrmse(recent_predictions: list[dict]) -> float:
-    """[{"predicted": 3200.0, "actual": 3350.0}, ...] -> nRMSE(%). 빈 목록이면 0.0"""
-    if not recent_predictions:
-        return 0.0
-    return nrmse([p["actual"] for p in recent_predictions], [p["predicted"] for p in recent_predictions])
+def _mean(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
 
 
-def is_drift(recent_predictions: list[dict]) -> bool:
-    """(데이터 충분한가?) -> 최근 21건만 -> nRMSE 계산 -> 기준(8%)보다 크면 드리프트"""
-    if len(recent_predictions) < WINDOW_SIZE:
-        return False  # 아직 판단할 만큼 데이터가 쌓이지 않음
-    window = recent_predictions[-WINDOW_SIZE:]
-    return compute_nrmse(window) > NRMSE_THRESHOLD
+def window(plant_id: str) -> list[dict]:
+    return records[plant_id][-WINDOW_DAYS:]
+
+
+def compute_window_error(plant_id: str) -> float | None:
+    return _mean([r["day_error"] for r in window(plant_id)])
+
+
+def fleet_share_over_threshold() -> tuple[float, int]:
+    """기록이 충분한 발전소 중 오차 > 8% 인 비율과 발전소 수."""
+    over, n = 0, 0
+    for pid in records:
+        w = window(pid)
+        if len([r for r in w if r["day_error"] is not None]) < MIN_DAYS:
+            continue
+        n += 1
+        if compute_window_error(pid) > ERROR_THRESHOLD:
+            over += 1
+    return (over / n if n else 0.0), n
+
+
+def classify(plant_id: str) -> dict:
+    """
+    돌려줄 것: {"status": "ok" | "insufficient" | "weather" | "equipment" | "soiling" | "model_drift",
+               "action": "none" | "alert" | "retrain", "window_error": .., "pr_recent": .., "pr_before": .., "fleet_share": ..}
+    """
+    w = window(plant_id)
+    errs = [r["day_error"] for r in w if r["day_error"] is not None]
+    out = {"plant_id": plant_id, "n_days": len(errs)}
+    if len(errs) < MIN_DAYS:
+        out.update(status="insufficient", action="none", window_error=_mean(errs))
+        return out
+
+    err = _mean(errs)
+    prs = [r["pr"] for r in w if r["pr"] is not None]
+    pr_recent = _mean(prs[-PR_RECENT_DAYS:]) if prs else None
+    pr_before = _mean(prs[:-PR_RECENT_DAYS]) if len(prs) > PR_RECENT_DAYS + 2 else None
+    share, n_plants = fleet_share_over_threshold()
+    out.update(window_error=round(err, 2), pr_recent=None if pr_recent is None else round(pr_recent, 3),
+               pr_before=None if pr_before is None else round(pr_before, 3), fleet_share=round(share, 2),
+               fleet_plants=n_plants)
+
+    if err <= ERROR_THRESHOLD:
+        out.update(status="ok", action="none")
+        return out
+
+    drop = (pr_before - pr_recent) if (pr_before is not None and pr_recent is not None) else None
+    if pr_recent is not None and pr_recent < PR_EQUIPMENT and (drop is None or drop >= PR_EQUIPMENT_DROP):
+        out.update(status="equipment", action="alert")
+    elif pr_recent is not None and pr_recent < PR_SOILING and drop is not None and drop >= PR_SOILING_DROP:
+        out.update(status="soiling", action="alert")
+    elif (n_plants >= 2 and share >= FLEET_SHARE) or (pr_recent is not None and pr_recent > PR_FLEET_HIGH):
+        out.update(status="model_drift", action="retrain")
+    else:
+        out.update(status="weather", action="alert")
+    return out
+
+
+def is_drift(plant_id: str) -> bool:
+    """HAIC 호환: 재학습이 필요한 드리프트인지 True/False"""
+    return classify(plant_id)["action"] == "retrain"

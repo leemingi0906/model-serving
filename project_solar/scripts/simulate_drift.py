@@ -1,64 +1,75 @@
 """
-Day3 드리프트 감지 시뮬레이션 (SolarCast)
+Day3 드리프트 시뮬레이션 (SolarCast v2) - 실제 실적을 구간별로 잘라 주입하고 원인 분류·대응을 확인한다.
 
-HAIC 실습은 랜덤워크로 "변동성 3배" 드리프트를 만들었지만, 태양광은 실제 실적 데이터가 있으므로
-기획안의 드리프트 신호 후보를 그대로 실제 구간/실제 사건으로 재현합니다.
+    시나리오       데이터                                        기대 판정 -> 대응
+    normal         삼천포2 최근 21일 (2026-08)                      ok
+    monsoon        삼천포2 장마철 2026-06-20 ~ 07-10 (21일)          ok 또는 weather (PR 정상) -> 재학습 안 함
+    equipment      삼천포2 최근 21일, 8일째부터 발전량 x0.5           equipment -> [ALERT] 재학습 금지
+    fleet_shift    발전소 3곳 최근 21일 x1.25 (전 발전소 동시 변화)   model_drift -> 재학습 -> 게이트 -> 재배포
 
-    배치           데이터                                  기대 결과
-    normal         업로드 CSV 의 마지막 35일 (늦여름)         nRMSE <= 8%  -> ok
-    monsoon        장마철 2026-06-20 ~ 07-24 (35일, 실제)      계절 변동은 학습 분포 안 -> 대개 ok (경계 관찰용)
-    new_plant      마지막 35일 x 1.8 (신규 발전소 편입 가정)     학습 범위 밖 -> nRMSE > 8% -> 재학습 트리거
-
-사전 준비: uvicorn serving_app.main:app --port 8010 서버가 떠 있고, CSV 가 업로드되어 있어야 합니다.
-실행: python scripts/simulate_drift.py
+사전 준비: MODEL_SOURCE=mlflow uvicorn serving_app.main:app --port 8010 서버가 떠 있고, 실적이 업로드되어 있어야 한다.
+실행: python scripts/simulate_drift.py [--only normal,monsoon,...]
 """
+import argparse
 import os
 import sys
 
 import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data.features import load_rows, SEQ_LEN, DAILY_CAPACITY_KWH
-from data.storage import latest_upload
-from serving_app.monitoring.drift_detector import WINDOW_SIZE
 
-API_URL = os.getenv("API_URL", "http://localhost:8010/predict/batch-test")
-
-BATCH_N = SEQ_LEN + WINDOW_SIZE  # 14 + 21 = 35 -> 배치 하나당 정확히 21개의 (predicted, actual) 쌍
+BASE = os.getenv("API_BASE", "http://localhost:8010")
+N_DAYS = 21
 MONSOON_START = "2026-06-20"
-NEW_PLANT_SCALE = 1.8  # 집합자원에 0.8 MW 급 발전소가 추가로 편입된 상황
+FLEET = ["samcheonpo_2", "gwangyang_1", "yeongheung_1"]
 
 
-def pick_range(rows: list[dict], start: str, n: int = BATCH_N) -> list[float]:
-    idx = next(i for i, r in enumerate(rows) if r["Date"] >= start)
-    return [r["Gen"] for r in rows[idx : idx + n]]
+def fetch_window(plant_id, **params):
+    r = requests.get(f"{BASE}/data/window", params={"plant_id": plant_id, "n_days": N_DAYS, **params}, timeout=60)
+    r.raise_for_status()
+    return r.json()
 
 
-def send_batch(values: list[float], label: str) -> dict:
-    """배치를 /predict/batch-test 에 일괄 전송하고 드리프트 판정 결과를 출력한다."""
-    values = [min(v, DAILY_CAPACITY_KWH) for v in values]  # 스키마 상한(설비용량x24h) 안으로
-    resp = requests.post(API_URL, json={"values": values, "label": label}, timeout=900)
-    resp.raise_for_status()
-    result = resp.json()
-    print(f"[{label:9s}] drift_check = {result['drift_check']}")
-    return result
+def send(plant_id, label, records, persist=True):
+    r = requests.post(f"{BASE}/predict/batch-test",
+                      json={"plant_id": plant_id, "label": label, "records": records, "persist": persist}, timeout=1800)
+    r.raise_for_status()
+    res = r.json()
+    s, d = res["summary"], res["drift_check"]
+    print(f"[{label:11s}] {plant_id:<14} mean_error={s['mean_error']}% pass8={s['pass_rate_8']} PR={s['pr_mean']}  "
+          f"-> status={d.get('status')} action={d.get('action')}"
+          + (f" retrain={d['retrain'].get('promoted')} new_error={d['retrain'].get('mean_error')}" if "retrain" in d else ""))
+    return res
 
 
 def main():
-    rows = load_rows(latest_upload())
-    print(f"[1] 업로드 데이터: {rows[0]['Date']} ~ {rows[-1]['Date']} ({len(rows)}일)")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", default="normal,monsoon,equipment,fleet_shift")
+    args = ap.parse_args()
+    run = set(args.only.split(","))
 
-    print("[2] 정상 입력(최근 35일) 전송...")
-    normal = [r["Gen"] for r in rows[-BATCH_N:]]
-    send_batch(normal, label="normal")
+    if "normal" in run:
+        w = fetch_window("samcheonpo_2")
+        print(f"[1] 정상: {w['start']}~{w['end']}")
+        send("samcheonpo_2", "normal", w["records"])
 
-    print(f"[3] 장마철 실제 구간({MONSOON_START}~) 전송...")
-    send_batch(pick_range(rows, MONSOON_START), label="monsoon")
+    if "monsoon" in run:
+        w = fetch_window("samcheonpo_2", start=MONSOON_START)
+        print(f"[2] 장마철: {w['start']}~{w['end']}")
+        send("samcheonpo_2", "monsoon", w["records"], persist=False)
 
-    print(f"[4] 신규 발전소 편입(x{NEW_PLANT_SCALE}) 전송...")
-    send_batch([v * NEW_PLANT_SCALE for v in normal], label="new_plant")
+    if "equipment" in run:
+        w = fetch_window("samcheonpo_2", scale=0.5, scale_from_day=7)
+        print(f"[3] 설비 고장(8일째부터 x0.5): {w['start']}~{w['end']}")
+        send("samcheonpo_2", "equipment", w["records"], persist=False)
 
-    print("[5] 결과 확인: logs/aiops.log 에서 [WARN] drift detected -> [INFO] retrain triggered -> [OK] 를 확인하세요.")
+    if "fleet_shift" in run:
+        print(f"[4] 전 발전소 변화(x1.25): {', '.join(FLEET)}")
+        for pid in FLEET:
+            w = fetch_window(pid, scale=1.25)
+            send(pid, "fleet_shift", w["records"])
+
+    print("[5] logs/aiops.log 와 /predict/drift-state 를 확인하세요.")
 
 
 if __name__ == "__main__":

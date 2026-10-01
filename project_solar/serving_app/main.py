@@ -39,7 +39,7 @@ _SWAGGER_DIR = os.path.join(_STATIC_DIR, "swagger")
 _OFFLINE_SWAGGER = os.path.isfile(os.path.join(_SWAGGER_DIR, "swagger-ui-bundle.js"))
 
 app = FastAPI(
-    title="SolarCast - 태양광 일 발전량 예측 Serving & AIOps",
+    title="SolarCast v2 - 태양광 시간별 발전량 예측 Serving & AIOps",
     docs_url=None if _OFFLINE_SWAGGER else "/docs",
 )
 

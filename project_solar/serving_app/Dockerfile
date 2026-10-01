@@ -22,7 +22,7 @@ COPY scripts/ scripts/
 # 학습(등록)과 서빙이 항상 같은 컨테이너의 같은 파일시스템(/app) 안에서 이뤄집니다 -
 # 여러 컨테이너가 네트워크로 서로의 모델/아티팩트를 찾아가야 하는 구조 자체가 없습니다.
 RUN mkdir -p data/uploads \
- && cp data/sample_samcheonpo2_daily.csv data/uploads/build_seed.csv \
+ && cp data/sample_solar_hourly.csv.gz data/uploads/build_seed.csv.gz \
  && python scripts/train_baseline_v1.py \
  && python serving_app/train_and_register.py
 

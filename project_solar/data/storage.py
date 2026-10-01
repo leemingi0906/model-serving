@@ -1,24 +1,54 @@
 """
-업로드된 HAIC 데이터 파일 관리.
+업로드된 발전 실적 파일 관리 + 운영 중 들어온 최근 실적(배치 테스트로 주입된 값) 보관.
 
-data/generate_haic_data.py로 자동 생성하던 방식 대신, 대시보드에서 CSV 파일을
-직접 업로드하는 방식으로 바뀌었습니다 (serving_app/routers/data.py 참고).
-업로드된 파일은 이 디렉터리(data/uploads/)에 타임스탬프가 붙은 이름으로 계속
-쌓이고(과거 파일을 덮어쓰지 않습니다), 학습(train_and_register.py 등)은 항상
-가장 최근에 올라온 파일 하나를 사용합니다.
+    data/uploads/   대시보드 /data/upload 로 올린 CSV(.csv 또는 .csv.gz). 학습은 항상 가장 최근 파일.
+    data/recent/    /predict/batch-test 가 "실적 도착"으로 받아들인 시간별 값. plant_id 별 CSV 에 덧붙인다.
+                    재학습(fine_tune)은 업로드 데이터 위에 이 값을 덮어써서(최근이 우선) 최근 30일을 만든다.
+                    -> 드리프트를 일으킨 바로 그 데이터로 재학습이 이뤄진다 (HAIC 실습의 단순화와 다른 점).
 """
+import csv
 import glob
 import os
 
 UPLOAD_DIR = "data/uploads"
+RECENT_DIR = "data/recent"
 
 
 def latest_upload(upload_dir: str = UPLOAD_DIR) -> str:
-    """data/uploads/ 에 쌓인 CSV 중 가장 최근에 업로드된 파일의 경로를 반환한다."""
-    files = sorted(glob.glob(os.path.join(upload_dir, "*.csv")), key=os.path.getmtime)
+    files = sorted(glob.glob(os.path.join(upload_dir, "*.csv")) + glob.glob(os.path.join(upload_dir, "*.csv.gz")),
+                   key=os.path.getmtime)
     if not files:
         raise FileNotFoundError(
-            "업로드된 HAIC 데이터가 없습니다. 대시보드에서 CSV 파일을 먼저 업로드하세요 "
-            f"(data/sample_haic_prices.csv를 예시로 업로드해볼 수 있습니다 -> {upload_dir}/)."
+            "업로드된 발전 실적이 없습니다. 대시보드에서 CSV 를 먼저 업로드하세요 "
+            f"(data/sample_solar_hourly.csv.gz 를 예시로 올릴 수 있습니다 -> {upload_dir}/)."
         )
     return files[-1]
+
+
+def append_recent(plant_id: str, records: list[dict], recent_dir: str = RECENT_DIR) -> str:
+    """records = [{'time': 'YYYY-MM-DD HH:00', 'generation_kwh': float}, ...]"""
+    os.makedirs(recent_dir, exist_ok=True)
+    path = os.path.join(recent_dir, f"{plant_id}.csv")
+    new = not os.path.exists(path)
+    with open(path, "a", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        if new:
+            w.writerow(["time", "generation_kwh"])
+        for r in records:
+            w.writerow([r["time"], r["generation_kwh"]])
+    return path
+
+
+def load_recent(recent_dir: str = RECENT_DIR) -> dict[str, dict[str, float]]:
+    out: dict[str, dict[str, float]] = {}
+    for path in glob.glob(os.path.join(recent_dir, "*.csv")):
+        pid = os.path.basename(path)[:-4]
+        with open(path, encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                out.setdefault(pid, {})[r["time"]] = float(r["generation_kwh"])  # 뒤에 쓴 값이 이김
+    return out
+
+
+def clear_recent(recent_dir: str = RECENT_DIR) -> None:
+    for path in glob.glob(os.path.join(recent_dir, "*.csv")):
+        os.remove(path)

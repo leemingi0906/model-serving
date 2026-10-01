@@ -118,7 +118,7 @@
     </div>
     <div class="brand-text">
       <div class="title">SolarCast · 태양광</div>
-      <div class="subtitle">일 발전량 예측 · 드리프트 감지 기반 재학습 파이프라인</div>
+      <div class="subtitle">v2 · 시간별 통합 모델 · 드리프트 원인 분류 기반 대응</div>
     </div>
   </div>
   <div class="nav-right">
@@ -134,12 +134,12 @@
       <h2>발전 실적 데이터 업로드</h2>
       <p>
         <code>data/uploads/</code>는 여기서 업로드한 CSV만 쌓이는 곳입니다. 학습(<code>train_and_register.py</code> 등)은
-        항상 가장 최근에 올라온 파일을 사용합니다. <code>data/sample_samcheonpo2_daily.csv</code>(삼천포 2호기 2023-01~2026-08 실적)를 올려보세요
-        (컬럼: Date, generation_kwh · 최소 35행).
+        항상 가장 최근에 올라온 파일을 사용합니다. <code>data/sample_solar_hourly.csv.gz</code>(발전소 10곳 시간별 실적 2023-01~2026-08)를 올려보세요
+        (컬럼: plant_id, time, generation_kwh · .csv 또는 .csv.gz). 기상(관측·예보)과 발전소 레지스트리는 서버에 동봉되어 있습니다.
       </p>
     </div>
     <div class="upload-row">
-      <input type="file" id="upload-input" accept=".csv" />
+      <input type="file" id="upload-input" accept=".csv,.gz" />
       <button class="btn primary" onclick="uploadFile()">업로드</button>
     </div>
     <div id="upload-status" style="margin-top:10px;"></div>
@@ -150,15 +150,17 @@
     <div class="section-head">
       <h2>드리프트 시뮬레이션</h2>
       <p>
-        업로드된 <b>실제 실적</b>에서 35일 구간을 잘라 <code>/predict/batch-test</code>로 전송합니다 (가짜 데이터를 만들지 않습니다).
-        정상 = 최근 35일 · 장마철 = 2026-06-20부터 35일 · 신규 발전소 편입 = 최근 35일 × 1.8 (학습 범위 밖 → 드리프트).
-        드리프트가 감지되면 아래 파이프라인이 감지 → fine-tuning → (nRMSE ≤ 8% 통과 시) 재배포까지 진행됩니다.
+        업로드된 <b>실제 실적</b>에서 21일 구간(+이력 3일)을 잘라 <code>/predict/batch-test</code>로 보냅니다. 서버는 날짜마다
+        "이력 72시간 + 그날 관측 기상"으로 기대치를 만들어 <b>제도 오차율</b>과 <b>성능비 PR</b>을 기록하고 원인을 분류합니다.<br/>
+        정상 = 삼천포2 최근 21일 · 장마철 = 2026-06-20부터 21일(PR 정상 → 재학습 안 함) · 설비 고장 = 8일째부터 ×0.5(PR 급락 → 알림, 재학습 금지)
+        · 전 발전소 변화 = 3곳 ×1.25(모델 드리프트 → fine-tuning → 게이트 → 재배포).
       </p>
     </div>
     <div class="btn-row">
-      <button class="btn primary" onclick="sendBatch('normal')">정상 배치 (최근 35일)</button>
-      <button class="btn secondary" onclick="sendBatch('monsoon')">장마철 배치 (2026-06-20~)</button>
-      <button class="btn danger" onclick="sendBatch('new_plant')">신규 발전소 편입 (×1.8)</button>
+      <button class="btn primary" onclick="sendBatch('normal')">정상 (삼천포2 최근 21일)</button>
+      <button class="btn secondary" onclick="sendBatch('monsoon')">장마철 (2026-06-20~)</button>
+      <button class="btn secondary" onclick="sendBatch('equipment')">설비 고장 (8일째부터 ×0.5)</button>
+      <button class="btn danger" onclick="sendBatch('fleet_shift')">전 발전소 변화 (3곳 ×1.25)</button>
     </div>
     <div id="drift-status" style="margin-top:14px;"></div>
     <div id="drift-result" class="result-box"></div>
@@ -186,7 +188,7 @@
         <p>
           드리프트 감지·재학습 트리거는 <code>logs/aiops.log</code>에 그대로 기록됩니다.
           <code>[WARN] drift detected</code> → <code>[INFO] retrain triggered</code> →
-          <code>[OK] new_nrmse=...% promoted</code> 순서로 남는지 아래에서 직접 열어 확인하세요.
+          <code>[OK] new_error=...% promoted</code> 순서로, 설비 이상·오염은 <code>[ALERT]</code> 로 남는지 아래에서 직접 열어 확인하세요.
         </p>
       </div>
     </div>
@@ -196,23 +198,22 @@
 
 </div>
 
-<footer>SolarCast · 태양광 일 발전량 예측 B2B 서비스 데모 (HAIC 실습 구조 재사용 · serving_app/static/index.html)</footer>
+<footer>SolarCast v2 · 태양광 시간별 발전량 예측 B2B 서비스 데모 (HAIC 실습 구조 재사용 · serving_app/static/index.html)</footer>
 
 <script>
 /* ===================== 전역 상태 ===================== */
 // 서버(data/features.py, monitoring/drift_detector.py)와 동일한 값 (상수만 복제)
-const SEQ_LEN = 14;
-const WINDOW_SIZE = 21;
-const NRMSE_THRESHOLD = 8.0;   // % (설비용량 대비)
-const DAILY_CAPACITY_KWH = 1000 * 24;
+const WINDOW_DAYS = 21;
+const ERROR_THRESHOLD = 8.0;   // % (제도 오차율, 설비용량 대비)
 
 let lastPipelineRun = null; // { driftCheck, clientRmse, ts }
 
 const PIPELINE_STAGES = [
   { key: "collect", title: "데이터 수집", desc: "요청 수신" },
   { key: "monitor", title: "데이터 모니터링", desc: "예측 기록 누적" },
-  { key: "detect", title: "드리프트 감지", desc: "nRMSE vs 8%" },
-  { key: "trigger", title: "재학습 트리거", desc: "조건 충족 시 시작" },
+  { key: "detect", title: "드리프트 감지", desc: "오차율 vs 8%" },
+  { key: "classify", title: "원인 분류", desc: "PR · 발전소 동시성" },
+  { key: "trigger", title: "재학습 트리거", desc: "model_drift 일 때만" },
   { key: "train", title: "모델 학습", desc: "fine-tuning" },
   { key: "register", title: "모델 등록", desc: "MLflow Registry" },
   { key: "deploy", title: "배포", desc: "Production 승격" },
@@ -221,17 +222,18 @@ const PIPELINE_STAGES = [
 /* ===================== 유틸 ===================== */
 // 실제 실적 구간을 서버에서 받아온다 (routers/data.py 의 /data/window)
 const BATCHES = {
-  normal:    { label: "정상 (최근 35일)",          query: "" },
-  monsoon:   { label: "장마철 (2026-06-20~)",      query: "?start=2026-06-20" },
-  new_plant: { label: "신규 발전소 편입 (×1.8)",   query: "?scale=1.8" },
+  normal:      { label: "정상 (삼천포2 최근 21일)",   runs: [{ plant: "samcheonpo_2", query: "", persist: true }] },
+  monsoon:     { label: "장마철 (2026-06-20~)",       runs: [{ plant: "samcheonpo_2", query: "&start=2026-06-20", persist: false }] },
+  equipment:   { label: "설비 고장 (8일째부터 ×0.5)", runs: [{ plant: "samcheonpo_2", query: "&scale=0.5&scale_from_day=7", persist: false }] },
+  fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "gwangyang_1", "yeongheung_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
 };
-function nrmseOf(actual, predicted) {
-  const n = Math.min(actual.length, predicted.length);
-  if (n === 0) return null;
-  let sum = 0;
-  for (let i = 0; i < n; i++) sum += (actual[i] - predicted[i]) ** 2;
-  return Math.sqrt(sum / n) / DAILY_CAPACITY_KWH * 100;
-}
+const STATUS_LABEL = {
+  ok: "정상 (오차율 ≤ 8%)", insufficient: "판단 보류 (기록 7일 미만)",
+  weather: "날씨·예보 오차 (PR 정상) → 알림만, 재학습 안 함",
+  equipment: "설비 이상 의심 (PR 급락) → 운영자 알림, 재학습 금지",
+  soiling: "오염 의심 (PR 완만 하락) → 세척 알림, 재학습 안 함",
+  model_drift: "모델 드리프트 (여러 발전소 동시) → 재학습",
+};
 function relTime(ts) {
   if (!ts) return "-";
   const diff = Math.max(0, Date.now() / 1000 - ts);
@@ -316,18 +318,18 @@ function renderPipeline() {
   badge.className = "pill neutral";
   badge.textContent = `마지막 실행 ${relTime(ts)}`;
 
-  const serverStatus = driftCheck.status; // "ok" | "retrain_triggered"
-  const promoted = driftCheck.promoted;
+  const st = driftCheck.status;
+  const promoted = driftCheck.retrain && driftCheck.retrain.promoted;
 
-  let states; // 7개 단계 상태: idle | ok | warn
-  if (serverStatus === "retrain_triggered" && promoted === true) {
-    states = ["ok", "ok", "warn", "ok", "ok", "ok", "ok"];
-  } else if (serverStatus === "retrain_triggered" && promoted === false) {
-    states = ["ok", "ok", "warn", "ok", "ok", "warn", "idle"];
-  } else if (serverStatus === "retrain_triggered") {
-    states = ["ok", "ok", "warn", "idle", "idle", "idle", "idle"];
+  let states; // 8개 단계 상태: idle | ok | warn
+  if (st === "model_drift" && promoted === true) {
+    states = ["ok", "ok", "warn", "warn", "ok", "ok", "ok", "ok"];
+  } else if (st === "model_drift") {
+    states = ["ok", "ok", "warn", "warn", "ok", "ok", "warn", "idle"];
+  } else if (st === "equipment" || st === "soiling" || st === "weather") {
+    states = ["ok", "ok", "warn", "warn", "idle", "idle", "idle", "idle"];   // 분류 결과: 알림, 재학습 트리거 안 함
   } else {
-    states = ["ok", "ok", "ok", "idle", "idle", "idle", "idle"];
+    states = ["ok", "ok", "ok", "ok", "idle", "idle", "idle", "idle"];
   }
   const statusText = { ok: "완료", warn: "감지됨", idle: "대기 중" };
 
@@ -347,46 +349,46 @@ async function sendBatch(kind) {
   const statusEl = document.getElementById("drift-status");
   const resultBox = document.getElementById("drift-result");
   const batch = BATCHES[kind];
-  statusEl.innerHTML = `<span class="pill warn"><span class="dot"></span>${batch.label} 전송 중… (fine-tuning이 걸리면 수십 초 걸릴 수 있습니다)</span>`;
+  statusEl.innerHTML = `<span class="pill warn"><span class="dot"></span>${batch.label} 전송 중… (재학습이 걸리면 1~2분 걸릴 수 있습니다)</span>`;
 
   try {
-    const win = await getJSON(`/data/window${batch.query}`);
-    if (!win.ok) {
-      statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${(win.data && win.data.detail) || "실적 데이터를 먼저 업로드하세요"}</span>`;
-      return;
+    let data = null, win = null;
+    const all = [];
+    for (const run of batch.runs) {
+      win = await getJSON(`/data/window?plant_id=${run.plant}&n_days=${WINDOW_DAYS}${run.query}`);
+      if (!win.ok) {
+        statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${(win.data && win.data.detail) || "실적 데이터를 먼저 업로드하세요"}</span>`;
+        return;
+      }
+      const res = await fetch("/predict/batch-test", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plant_id: run.plant, label: kind, records: win.data.records, persist: run.persist }) });
+      data = await safeJson(res);
+      if (!res.ok) {
+        statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>서버 오류 (${res.status})</span>`;
+        showResult(resultBox, { status: res.status, detail: data }, true);
+        return;
+      }
+      all.push({ plant: run.plant, summary: data.summary, drift_check: data.drift_check });
     }
-    const prices = win.data.values;
-    const res = await fetch("/predict/batch-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: prices, label: kind }) });
-    const data = await safeJson(res);
-    if (!res.ok) {
-      const reason = data.__raw
-        ? "서버 오류 - model_loader.py 또는 predict.py의 TODO가 아직 구현되지 않았을 수 있습니다"
-        : "오류 (TODO 미구현일 수 있음)";
-      statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${reason}</span>`;
-      showResult(resultBox, { status: res.status, detail: data }, true);
-      return;
-    }
-    const actual = [];
-    for (let i = 0; i < prices.length - SEQ_LEN; i++) actual.push(prices[i + SEQ_LEN]);
-    const clientRmse = nrmseOf(actual, data.predictions || []);
 
-    lastPipelineRun = { driftCheck: data.drift_check || {}, clientRmse, ts: Date.now() / 1000 };
+    lastPipelineRun = { driftCheck: data.drift_check || {}, ts: Date.now() / 1000 };
     renderPipeline();
     loadLogFiles();
 
     const check = data.drift_check || {};
-    let level = "ok", label = `정상 (드리프트 없음 · nRMSE ${check.nrmse ?? "-"}% ≤ 8%)`;
-    if (check.status === "retrain_triggered" && check.promoted) {
-      level = "ok"; label = `드리프트 nRMSE ${check.nrmse}% → 재학습 완료 · 새 버전 승격 (new_nrmse=${check.new_nrmse?.toFixed?.(2) ?? check.new_nrmse}%)`;
-    } else if (check.status === "retrain_triggered" && check.promoted === false) {
-      level = "warn"; label = `드리프트 nRMSE ${check.nrmse}% → 재학습했지만 게이트 미통과 (new_nrmse=${check.new_nrmse?.toFixed?.(2) ?? check.new_nrmse}%)`;
-    } else if (check.status === "retrain_triggered") {
-      level = "warn"; label = "드리프트 감지 · 재학습 트리거됨";
+    const s = data.summary || {};
+    let level = (check.action === "retrain") ? (check.retrain && check.retrain.promoted ? "ok" : "warn")
+              : (check.action === "alert" ? "warn" : "ok");
+    let label = STATUS_LABEL[check.status] || check.status;
+    if (check.status === "model_drift" && check.retrain) {
+      label += check.retrain.promoted
+        ? ` · 재학습 완료, 새 버전 승격 (new_error=${check.retrain.mean_error?.toFixed?.(2)}%)`
+        : ` · 재학습했지만 게이트 미통과 (new_error=${check.retrain.mean_error})`;
     }
     statusEl.innerHTML = `
       <span class="pill ${level}"><span class="dot"></span>${label}</span>
-      <span class="pill neutral" style="margin-left:6px;">${win.data.start_date} ~ ${win.data.end_date} · 클라이언트 계산 nRMSE: ${clientRmse != null ? clientRmse.toFixed(2) + "%" : "-"}</span>`;
-    showResult(resultBox, data, false);
+      <span class="pill neutral" style="margin-left:6px;">${data.plant_id} · ${win.data.start} ~ ${win.data.end} · 일 오차율 평균 ${s.mean_error}% · 8% 통과율 ${s.pass_rate_8} · PR ${s.pr_mean} · 창(21일) 오차 ${check.window_error ?? "-"}%</span>`;
+    showResult(resultBox, batch.runs.length > 1 ? all : data, false);
   } catch (e) {
     statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>연결 실패</span>`;
     showResult(resultBox, "요청 실패: " + e.message, true);

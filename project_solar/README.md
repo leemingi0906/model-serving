@@ -1,69 +1,60 @@
-# SolarCast - 태양광 일 발전량 예측 B2B 서비스 (조별과제)
+# SolarCast v2 - 태양광 시간별 발전량 예측 B2B 서비스 (조별과제)
 
-HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프를 그대로 쓰고,
-데이터·지표·드리프트 시나리오만 **삼천포 태양광 2호기 실제 일 발전량**으로 바꾼 복제본입니다.
-기획안: https://claude.ai/code/artifact/99cef027-f8a6-4d2a-81ec-aefc85a12335
+HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위에, 발전소 통합 시간별 모델과
+드리프트 **원인 분류** 기반 대응을 얹은 버전입니다. 기획안: https://claude.ai/code/artifact/99cef027-f8a6-4d2a-81ec-aefc85a12335
+데이터 규칙: `../team_solar/DATA_SCHEMA.md`
 
-## HAIC 실습과 바뀐 점
+## HAIC 실습 → v2 에서 바뀐 것
 
-| 항목 | HAIC (`project/`) | SolarCast (`project_solar/`) | 바뀐 파일 |
+| 항목 | HAIC (`project/`) | SolarCast v2 | 파일 |
 |---|---|---|---|
-| 예측 대상 | 다음 날 종가 ($) | 다음 날 일 발전량 (kWh) | `schemas.py` |
-| 입력 | 최근 20거래일 (close, volume) | 최근 14일 generation_kwh (피처 1개) | `data/features.py`, `lstm_model.py` |
-| 데이터 | IBM 참조 가상 시세 756행 | 삼천포 2호기 2023-01-01~2026-08-31 실적 1,339행 | `data/sample_samcheonpo2_daily.csv` |
-| 배포 게이트 | RMSE ≤ $4.00 | **nRMSE ≤ 8%** (설비용량 대비, 정산금 기준과 동일) | `train_and_register.py` |
-| 드리프트 판정 | 최근 21건 RMSE > $4 | 최근 21일 nRMSE > 8% | `monitoring/drift_detector.py` |
-| 재학습 | 최근 21거래일 fine-tuning | 최근 30일 fine-tuning (warm start, 10 epoch) | `monitoring/retrain_trigger.py` |
-| 드리프트 시나리오 | 랜덤워크 변동성 3배 | 실제 구간 주입: 정상(최근 35일) / 장마철(2026-06-20~) / 신규 발전소 편입(×1.8) | `scripts/simulate_drift.py`, `routers/data.py` `/data/window` |
-| 재배포 확인 | model_version="production" | `production-v{N}` 라벨 + 승격 시 캐시 무효화 | `model_loader.py` |
+| 예측 대상 | 다음 날 종가 1개 | 다음 날 **24시간** 발전량 (제도 제출 포맷) | `schemas.py`, `lstm_model.py` |
+| 입력 | 최근 20일 (close, volume) | 과거 72h 이용률 + 내일 24h 기상(일사·운량·기온) + 태양고도 + 날짜 | `data/features.py`, `data/solar.py` |
+| 단위 | 달러 | 이용률 = kWh ÷ 설비용량 → 발전소 10곳을 한 모델로 | `data/plants.csv` |
+| 데이터 | 가상 시세 756행 | 실제 실적 10곳 × 3.7년 시간별(32만 행) + Open-Meteo 기상 | `data/sample_solar_hourly.csv.gz`, `data/weather/` |
+| 게이트 | RMSE ≤ $4 | **제도 오차율**: 테스트 1년 일 오차율 평균 ≤ 8% (+ 8%/6% 통과율 기록) | `train_and_register.py`, `data/metrics.py` |
+| 드리프트 | 오차 크면 재학습 | 오차율 + 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
+| 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포 | `monitoring/retrain_trigger.py` |
+| 재학습 데이터 | 업로드 파일 마지막 41행 | 업로드 + 운영 중 수신한 실적(`data/recent/`) → 드리프트를 일으킨 데이터로 재학습 | `data/storage.py` |
+| 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) | `scripts/simulate_drift.py`, `/data/window` |
 
-**nRMSE 정의**: RMSE(kWh) ÷ (설비용량 kW × 24h) × 100. 발전량 예측제도의 시간별 오차율
-(|예측−실제| ÷ 설비용량)을 일 단위로 옮긴 것입니다. 설비용량은 공식 자료를 찾지 못해 시간 발전량
-피크(847 kWh/h)로부터 **1 MW 로 가정**했습니다 (`data/features.py`의 `CAPACITY_KW` 하나만 바꾸면 됩니다).
+**지표 정의** (`data/metrics.py`): 시간별 오차율 = |예측−실제| ÷ 설비용량 × 100 (발전량이 용량 10% 이상인 시간만),
+일 오차율 = 그 평균, PR = 실제 일 발전량 ÷ 모델이 "그날 관측 기상"으로 낸 기대 발전량.
 
-## 사전 실험 (왜 피처가 발전량 하나인가)
-
-테스트 구간 2025-09~2026-08, 3층 LSTM, 60 epoch:
-
-| 입력 | RMSE (kWh) | nRMSE |
-|---|---|---|
-| 전날 값 그대로 (persistence) | 1,650 | 6.9% |
-| 발전량 14일 (채택) | 1,331 | 5.5% |
-| 발전량 + 계절(sin/cos day-of-year) | 1,399 | 5.8% |
-
-계절 피처는 도움이 되지 않았습니다. 기상(일사량·운량) 피처는 2단계 개선 항목이며
-`N_FEATURES` 와 `SolarScaler.transform_point` 만 늘리면 됩니다.
-
-## 실행 순서 (포트 8010 - HAIC 서버 8000 과 동시에 띄울 수 있음)
+## 실행 순서 (포트 8010)
 
 ```bash
 cd project_solar
 pip install -r requirements.txt
+# (저장소에 data/ 가 포함돼 있음. 다시 만들려면 저장소 루트에서 python project_solar/scripts/build_data.py)
 
 # --- Day1 ---
-uvicorn serving_app.main:app --host 0.0.0.0 --port 8010     # http://localhost:8010/ 대시보드, /docs
-# 대시보드에서 data/sample_samcheonpo2_daily.csv 업로드 (또는 curl -F file=@data/sample_samcheonpo2_daily.csv localhost:8010/data/upload)
-python scripts/train_baseline_v1.py                           # scaler.pkl + solarcast_v1.keras
+uvicorn serving_app.main:app --host 0.0.0.0 --port 8010        # http://localhost:8010/ 대시보드, /docs
+# 대시보드에서 data/sample_solar_hourly.csv.gz 업로드
+python scripts/train_baseline_v1.py                              # scaler.pkl + solarcast_v2.keras (CPU 수 분)
 
 # --- Day2 ---
-python serving_app/train_and_register.py                      # MLflow 기록 + nRMSE 8% 게이트 통과 시 Production 승격
+python serving_app/train_and_register.py                         # MLflow 기록 + 제도 오차율 게이트 → Production 승격
 MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8010
 
 # --- Day3 ---
-python scripts/simulate_drift.py                              # 정상 -> 장마철 -> 신규 발전소 편입 순서로 주입
+python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 전 발전소 변화
+cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 ```
 
-`/predict` 요청 예시:
+`/predict` 요청 예시 (D=2026-09-01, 삼천포 2호기):
 
 ```json
-{"sequence": [{"generation_kwh": 3320.8}, {"generation_kwh": 3918.0}, {"...": "12개 더"}]}
+{"plant_id": "samcheonpo_2", "date": "2026-09-01",
+ "history_kwh": [0, 0, ..., 312.5],            // D-3 01:00 ~ D-1 24:00, 72개
+ "forecast": [{"ghi": 0, "cloud_cover": 20, "temperature": 23.1}, ... 24개]}
 ```
 
-응답: `{"predicted_kwh": 3410.5, "model_version": "production-v1"}`
+응답: `{"plant_id": "samcheonpo_2", "date": "2026-09-01", "hourly_kwh": [0, 0, ..., 0], "day_total_kwh": 3410.5, "model_version": "production-v1"}`
 
 ## 완료 기준
 
-- [ ] `/data/upload` 로 실적 CSV 를 올리면 `/data/status` 에 기간·행수가 보이는가
-- [ ] 정상 배치 nRMSE ≤ 8%, 신규 발전소 편입 배치 nRMSE > 8% 가 재현되는가
-- [ ] `logs/aiops.log` 에 `[WARN] drift detected` → `[INFO] retrain triggered` → `[OK] new_nrmse=...` 순서로 기록되는가
+- [ ] `/data/upload` 로 시간별 실적을 올리면 `/data/status` 에 발전소 10곳·기간이 보이는가
+- [ ] Day2 게이트: 테스트 1년 일 오차율 평균 ≤ 8% 로 Production 승격되는가 (기상 없는 v1 과 수치 비교)
+- [ ] 장마철·설비 고장 배치는 재학습 없이 `[WARN]`/`[ALERT]` 만 남고, 전 발전소 변화 배치만 `[INFO] retrain triggered` → `[OK]` 로 이어지는가
 - [ ] 재배포 후 `/predict` 의 `model_version` 이 `production-v2` 로 바뀌는가

@@ -1,57 +1,119 @@
 """
-[Day1 -> Day3] 예측 API - serving_app/routers/predict.py (SolarCast)
+[Day1 -> Day3] 예측 API - serving_app/routers/predict.py (SolarCast v2)
 
-   [Day1] POST /predict             : 14일치 일 발전량 -> 다음 날 발전량 1개 (kWh)
-   [Day3] POST /predict/batch-test  : 긴 발전량 목록 -> 슬라이딩 윈도우로 여러 번 예측 -> 드리프트 검사
+   POST /predict             : 발전소 1곳, 다음 날 24시간 발전량 (제도 제출 포맷)
+   POST /predict/batch-test  : 시간별 실적을 받아 날짜별로 사후 평가 -> 오차율·PR 기록 -> 드리프트 원인 분류 -> 대응
 """
-from fastapi import APIRouter
+from datetime import date, timedelta
 
-from data.features import SEQ_LEN  # = 14
+from fastapi import APIRouter, HTTPException
+
+from data.features import HIST_HOURS, HORIZON, hour_keys, build_future, load_weather, WEATHER_OBS_PATH, WEATHER_SCALE
+from data.metrics import day_error_rate, performance_ratio, summarize
+from data.storage import append_recent
 from serving_app import model_loader
-from serving_app.schemas import PredictRequest, PredictResponse, BatchTestRequest, BatchTestResponse
-from serving_app.monitoring.drift_detector import WINDOW_SIZE
+from serving_app.schemas import (PredictRequest, PredictResponse, BatchTestRequest, BatchTestResponse, DayResult)
+from serving_app.monitoring.drift_detector import records
 from serving_app.monitoring.retrain_trigger import check_and_trigger
 
 router = APIRouter()
 
-# (Day3) 최근 예측 기록. 드리프트 판단은 최근 WINDOW_SIZE(21)건만 보므로 그만큼만 유지한다.
-recent_predictions: list[dict] = []
+_weather_obs: dict | None = None
+
+
+def weather_obs() -> dict:
+    global _weather_obs
+    if _weather_obs is None:
+        _weather_obs = load_weather(WEATHER_OBS_PATH)
+    return _weather_obs
+
+
+def _resolve_plant(plant_id: str, capacity_kw=None, lat=None, lon=None) -> dict:
+    p = model_loader.plants().get(plant_id)
+    if p is None:
+        if capacity_kw is None or lat is None or lon is None:
+            raise HTTPException(422, f"미등록 발전소 '{plant_id}': capacity_kw, lat, lon 을 함께 보내세요.")
+        return {"plant_id": plant_id, "capacity_kw": capacity_kw, "lat": lat, "lon": lon,
+                "loc": f"{round(lat, 3)}_{round(lon, 3)}"}
+    p = dict(p)
+    if capacity_kw:
+        p["capacity_kw"] = capacity_kw
+    return p
 
 
 @router.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest):
     """
-    받는 것  : {"sequence": [{"generation_kwh": 3320.8}, ... 14개]}
-    돌려줄 것: {"predicted_kwh": 3410.5, "model_version": "production-v1"}
+    받는 것: plant_id, date(D), history_kwh[72] (D-3~D-1), forecast[24] (D 의 기상 예보)
+    돌려줄 것: hourly_kwh[24], day_total_kwh, model_version
     """
+    plant = _resolve_plant(req.plant_id, req.capacity_kw, req.lat, req.lon)
     model = model_loader.get_model()
-    sequence = [p.model_dump() for p in req.sequence]
-    predicted = model.predict_one(sequence)
-    return PredictResponse(predicted_kwh=round(predicted, 1), model_version=model.version)
+    rows = [[w.ghi, w.cloud_cover, w.temperature] for w in req.forecast]
+    hourly = model.predict_day(plant, date.fromisoformat(req.date), req.history_kwh, rows)
+    return PredictResponse(plant_id=req.plant_id, date=req.date, hourly_kwh=hourly,
+                           day_total_kwh=round(sum(hourly), 1), model_version=model.version)
 
 
 @router.post("/predict/batch-test", response_model=BatchTestResponse)
 def batch_test(req: BatchTestRequest):
     """
-    받는 것  : {"values": [3320.8, 3918.0, ... 35개], "label": "monsoon"}
-    돌려줄 것: {"predictions": [예측값 21개], "drift_check": {"status": "ok", "nrmse": 5.1} 또는 재학습 결과}
-
-    슬라이딩 윈도우: 값 35개 -> 14개씩 잘라 "그다음 날"을 예측하고 실제 값과 비교 -> 21번 예측
+    실적 사후 평가 + 드리프트 시뮬레이션.
+      records = 연속된 시간별 실적 (최소 72 + 24 시간). 첫 3일은 이력으로만 쓰고, 4일째부터 하루씩:
+        이력 72h + 그날 "관측 기상" -> 모델 예측 = 기상 기대치(expected)
+        일 오차율 = 제도식, PR = 실제/기대치  -> drift_detector.records 에 누적
+      마지막에 check_and_trigger -> ok / weather / equipment / soiling / model_drift(재학습)
     """
+    plant = _resolve_plant(req.plant_id)
     model = model_loader.get_model()
-    predictions: list[float] = []
+    wloc = weather_obs().get(plant["loc"], {})
+    cap = plant["capacity_kw"]
 
-    values = req.values
-    for i in range(len(values) - SEQ_LEN):
-        window = values[i : i + SEQ_LEN]
-        sequence = [{"generation_kwh": v} for v in window]
-        pred = model.predict_one(sequence)
-        actual = values[i + SEQ_LEN]
-        predictions.append(round(pred, 1))
-        recent_predictions.append({"predicted": pred, "actual": actual})
+    gen = {r.time: r.generation_kwh for r in req.records}
+    days = sorted({t[:10] for t in gen})
+    results: list[DayResult] = []
+    for ds in days[3:]:
+        d = date.fromisoformat(ds)
+        hist, ok = [], True
+        for off in (3, 2, 1):
+            for k in hour_keys(d - timedelta(days=off)):
+                if k not in gen:
+                    ok = False
+                    break
+                hist.append([min(max(gen[k] / cap, 0.0), 1.0)])
+        actual = [gen.get(k) for k in hour_keys(d)]
+        if not ok or any(a is None for a in actual):
+            continue
+        future = build_future(plant, d, wloc)
+        if future is None:
+            continue
+        from data.features import doy_features
 
-    recent_predictions[:] = recent_predictions[-WINDOW_SIZE:]  # 최근 21건만 유지
+        cf = model.predict_cf(hist, future, doy_features(d))
+        expected = [c * cap for c in cf]
+        err = day_error_rate(expected, actual, cap)
+        pr = performance_ratio(actual, expected, cap)
+        records[req.plant_id].append({"date": ds, "day_error": err, "pr": pr, "label": req.label})
+        results.append(DayResult(date=ds, actual_kwh=round(sum(actual), 1), expected_kwh=round(sum(expected), 1),
+                                 day_error=None if err is None else round(err, 2),
+                                 pr=None if pr is None else round(pr, 3)))
 
-    drift_check = check_and_trigger(recent_predictions)
+    if not results:
+        raise HTTPException(400, "평가할 수 있는 날이 없습니다 (이력 72시간 + 그날 24시간 + 기상이 모두 있어야 합니다).")
+
+    if req.persist:
+        append_recent(req.plant_id, [{"time": r.time, "generation_kwh": r.generation_kwh} for r in req.records])
+
+    summary = summarize([r.day_error for r in results])
+    summary["pr_mean"] = round(sum(r.pr for r in results if r.pr is not None) / max(1, sum(1 for r in results if r.pr is not None)), 3)
+    drift_check = check_and_trigger(req.plant_id)
     drift_check["label"] = req.label
-    return BatchTestResponse(predictions=predictions, drift_check=drift_check)
+    return BatchTestResponse(plant_id=req.plant_id, label=req.label, days=results, summary=summary, drift_check=drift_check)
+
+
+@router.get("/predict/drift-state")
+def drift_state():
+    """발전소별 최근 기록 요약 (대시보드·디버깅용)"""
+    from serving_app.monitoring.drift_detector import classify
+
+    return {pid: classify(pid) for pid in records}

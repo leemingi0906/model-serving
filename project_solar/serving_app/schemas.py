@@ -1,41 +1,65 @@
 """
-SolarCast: FastAPI 요청/응답 Pydantic 스키마.
+SolarCast v2: FastAPI 요청/응답 스키마.
 
-/predict 는 최근 SEQ_LEN(14)일의 일 발전량 시퀀스를 받아 다음 날 일 발전량(kWh)을 돌려줍니다.
-학습 시점 피처(data/features.py)와 서빙 시점 입력이 어긋나지 않도록 길이(SEQ_LEN)와
-값 범위(ge=0: 발전량은 음수가 될 수 없고, 야간·고장일은 0 가능)를 스키마 단에서 강제합니다.
+/predict 는 제도 제출 포맷(다음 날 1시간 단위 24개)을 그대로 돌려준다.
+입력 검증이 학습 시점 피처(data/features.py)와 어긋나지 않도록 길이(72, 24)와 값 범위를 스키마 단에서 강제한다.
 """
 from pydantic import BaseModel, Field
 
-from data.features import SEQ_LEN, DAILY_CAPACITY_KWH
+from data.features import HIST_HOURS, HORIZON
 
 
-class DailyPoint(BaseModel):
-    # 설비용량으로 24시간 발전한 양을 넘는 값은 계측 오류이므로 거부 (le=DAILY_CAPACITY_KWH)
-    generation_kwh: float = Field(..., ge=0, le=DAILY_CAPACITY_KWH, description="해당 일 발전량(kWh)")
+class HourWeather(BaseModel):
+    ghi: float = Field(..., ge=0, le=1400, description="수평면 전일사 W/m2 (해당 시간 평균)")
+    cloud_cover: float = Field(..., ge=0, le=100, description="전운량 %")
+    temperature: float = Field(..., ge=-40, le=50, description="기온 C")
 
 
 class PredictRequest(BaseModel):
-    sequence: list[DailyPoint] = Field(
-        ...,
-        min_length=SEQ_LEN,
-        max_length=SEQ_LEN,
-        description=f"가장 오래된 날 -> 가장 최근 날 순서의 최근 {SEQ_LEN}일 일 발전량",
-    )
+    plant_id: str = Field(..., description="data/plants.csv 의 plant_id. 미등록 발전소면 capacity_kw·lat·lon 필수")
+    date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$", description="예측 대상일 (D)")
+    history_kwh: list[float] = Field(..., min_length=HIST_HOURS, max_length=HIST_HOURS,
+                                     description="D-3 01:00 ~ D-1 24:00 시간별 발전량 kWh (오래된 순)")
+    forecast: list[HourWeather] = Field(..., min_length=HORIZON, max_length=HORIZON,
+                                        description="D 01:00 ~ 24:00 기상 예보")
+    capacity_kw: float | None = Field(None, gt=0)
+    lat: float | None = Field(None, ge=-90, le=90)
+    lon: float | None = Field(None, ge=-180, le=180)
 
 
 class PredictResponse(BaseModel):
-    predicted_kwh: float
+    plant_id: str
+    date: str
+    hourly_kwh: list[float]
+    day_total_kwh: float
     model_version: str
 
 
+class HourRecord(BaseModel):
+    time: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2} \d{2}:00$", description="'YYYY-MM-DD HH:00', HH=01..24")
+    generation_kwh: float = Field(..., ge=0)
+
+
 class BatchTestRequest(BaseModel):
-    # Day3 드리프트 시뮬레이션에서 사용 (scripts/simulate_drift.py 참고)
-    # SEQ_LEN + N 개의 연속된 일 발전량을 보내면, 서버가 슬라이딩 윈도우로 잘라 N 건을 연속 예측한다.
-    values: list[float] = Field(..., min_length=SEQ_LEN + 1)
-    label: str = Field("batch", description="로그 식별용 배치 이름 (normal / monsoon / new_plant 등)")
+    # Day3 드리프트 시뮬레이션 / 실적 사후 평가: 연속된 시간별 실적을 보내면 서버가 날짜별로 잘라
+    # (72시간 이력 -> 그날 24시간) 예측하고, 서버가 가진 그날의 관측 기상으로 기대치를 만들어 오차율·PR 을 계산한다.
+    plant_id: str
+    label: str = Field("batch", description="normal / monsoon / equipment / fleet_shift 등 로그 식별용")
+    records: list[HourRecord] = Field(..., min_length=HIST_HOURS + HORIZON)
+    persist: bool = Field(True, description="True 면 실적으로 저장 -> 재학습 데이터에 반영")
+
+
+class DayResult(BaseModel):
+    date: str
+    actual_kwh: float
+    expected_kwh: float
+    day_error: float | None
+    pr: float | None
 
 
 class BatchTestResponse(BaseModel):
-    predictions: list[float]
+    plant_id: str
+    label: str
+    days: list[DayResult]
+    summary: dict
     drift_check: dict
