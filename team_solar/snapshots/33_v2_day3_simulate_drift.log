@@ -8,4 +8,10 @@
 [fleet_shift] samcheonpo_2   mean_error=12.22% pass8=0.35 PR=1.215  -> status=model_drift action=retrain
 [fleet_shift] samcheonpo_3   mean_error=13.61% pass8=0.1 PR=1.188  -> status=model_drift action=retrain
 [fleet_shift] gyeongsang_1   mean_error=14.22% pass8=0.053 PR=1.201  -> status=model_drift action=retrain retrain=True new_error=10.41
-[5] logs/aiops.log 와 /predict/drift-state 를 확인하세요.
+[실제] 광양항 2025-10 실제 저성능: 2025-10-05~2025-10-25
+[real_gwangyang] gwangyang_1    mean_error=30.63% pass8=0.1 PR=0.195  -> status=equipment action=alert
+[실제] 삼천포2 2025-12 실제 급락: 2025-12-05~2025-12-25
+[real_sc2_dec] samcheonpo_2   mean_error=17.38% pass8=0.4 PR=0.694  -> status=equipment action=alert
+[실제] 영흥#5 2026-08 실제 점진 손실: 2026-08-11~2026-08-31
+[real_yh5   ] yeongheung5_1  mean_error=15.83% pass8=0.278 PR=0.557  -> status=equipment action=alert
+[끝] logs/aiops.log 와 /predict/drift-state 를 확인하세요.

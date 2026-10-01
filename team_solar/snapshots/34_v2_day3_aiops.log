@@ -1,5 +1,11 @@
-2026-10-01 08:17:20,591 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=1.0)
-2026-10-01 08:17:20,591 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
-2026-10-01 08:17:28,182 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=gyeongsang_1, err=14.22% (thr 10.36%), pr_recent=1.206, pr_before=1.199, fleet_share=1.0)
-2026-10-01 08:17:28,190 [INFO] [INFO] retrain triggered (window=last_30_days, plants=gyeongsang_1,samcheonpo_2,samcheonpo_3)
-2026-10-01 08:17:49,802 [INFO] [OK] new_error=10.41% - production promoted: SolarCast_Hourly v2
+2026-10-01 08:49:43,297 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=1.0)
+2026-10-01 08:49:43,297 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
+2026-10-01 08:49:51,047 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=gyeongsang_1, err=14.22% (thr 10.36%), pr_recent=1.206, pr_before=1.199, fleet_share=1.0)
+2026-10-01 08:49:51,058 [INFO] [INFO] retrain triggered (window=last_30_days, plants=gyeongsang_1,samcheonpo_2,samcheonpo_3)
+2026-10-01 08:50:12,823 [INFO] [OK] new_error=10.41% - production promoted: SolarCast_Hourly v2
+2026-10-01 08:50:15,810 [WARNING] [WARN] drift detected (cause=equipment, plant=gwangyang_1, err=30.63% (thr 10.36%), pr_recent=0.378, pr_before=0.103, fleet_share=1.0)
+2026-10-01 08:50:15,810 [WARNING] [ALERT] equipment anomaly suspected at gwangyang_1 (PR 0.378) - retrain blocked, operator notified
+2026-10-01 08:50:18,072 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=17.39% (thr 10.36%), pr_recent=0.382, pr_before=0.85, fleet_share=1.0)
+2026-10-01 08:50:18,072 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.382) - retrain blocked, operator notified
+2026-10-01 08:50:20,175 [WARNING] [WARN] drift detected (cause=equipment, plant=yeongheung5_1, err=15.83% (thr 10.36%), pr_recent=0.582, pr_before=0.544, fleet_share=1.0)
+2026-10-01 08:50:20,175 [WARNING] [ALERT] equipment anomaly suspected at yeongheung5_1 (PR 0.582) - retrain blocked, operator notified

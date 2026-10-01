@@ -30,6 +30,7 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 | LSTM + 기상 (mse) | 8.98% | 0.51 | 0.32 |
 | + 낮 시간 가중 MAE | 8.33% | 0.57 | 0.38 |
 | **+ 발전소 임베딩 (채택)** | **7.99% (실험) / 8.29% (Production v1)** | **0.60 / 0.58** | 0.42 / 0.39 |
+| 같은 모델, 입력을 하루 전 예보로 (서빙 조건) | 9.85% | 0.49 | 0.31 |
 
 v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되지만, 일 총량 기준 persistence 대비 20% 개선에 그쳤던 것에 비해
 시간별 기상 모델은 persistence 대비 오차 절반입니다. 드리프트 임계값 = 8.29% × 1.25 = 10.36%.
@@ -40,6 +41,15 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 | 장마철 (2026-06-20~07-10) | 9.19% | 1.05 | ok (임계값 이내, PR 정상) |
 | 설비 고장 (8일째부터 ×0.5) | 16.29% | 0.66 → 최근 7일 0.46 | equipment → `[ALERT]` 재학습 차단 |
 | 전 발전소 변화 (경남 3곳 ×1.25) | 12.2 / 13.6 / 14.2% | 1.19~1.22 | model_drift → fine-tune(3곳, 30일) new_error 10.41% ≤ 현 12.0% → **v2 승격** |
+
+| 실제 사례 (주입 없음) | 일 오차율 | PR 최근 7일 | 판정 → 대응 |
+|---|---|---|---|
+| 광양항 2025-10-05~25 (PR 0.3 지속, 10/6~11 정지) | 23.5% | 0.44 | equipment → `[ALERT]` 재학습 차단 |
+| 삼천포2 2025-12-05~25 (12/16 급락, 1/9 복구) | 15.8% | 0.47 | equipment → `[ALERT]` |
+| 영흥#5 2026-08-11~31 (3월부터 점진 하락 0.96→0.64) | 11.7% | 0.68 | equipment → `[ALERT]` (60일+ 기록이면 soiling) |
+
+지난 1년 실제 데이터에서 발전소 10곳이 동시에 틀린 달은 없었습니다(월별 PR 중앙값 0.93~1.03). 즉 재학습이 필요한 모델 드리프트는 없었고
+이상은 전부 설비 문제였으며, 감지기는 세 건 모두 재학습을 막았습니다. 분석: `../team_solar/experiments/drift_analysis.py` (결과 JSON·로그 동봉).
 
 재배포 후 `/predict`: production-v1 → production-v2. 로그·캡처: `../team_solar/snapshots/3*_v2_*`, `2*_v2_*.png`.
 
@@ -60,7 +70,7 @@ python serving_app/train_and_register.py                         # MLflow 기록
 MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8010
 
 # --- Day3 ---
-python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 전 발전소 변화
+python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 전 발전소 변화 → 실제 사례 3건
 cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 ```
 
