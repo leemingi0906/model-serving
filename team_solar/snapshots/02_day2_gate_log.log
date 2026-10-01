@@ -1,0 +1,7 @@
+2026/10/01 03:07:04 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/10/01 03:07:04 INFO mlflow.store.db.utils: Updating database tables
+base-train: rmse=1386 kWh, nrmse=5.78% (test 265일)
+Successfully registered model 'SolarCast_Predictor'.
+2026/10/01 03:07:58 WARNING mlflow.tracking._model_registry.fluent: Run with id 0c39a7543832420ba96c5fde61af9003 has no artifacts at artifact path 'model', registering model based on models:/m-f21dc3870151485cb610b63a185b30ba instead
+Created version '1' of model 'SolarCast_Predictor'.
+[GATE PASSED] nrmse=5.78% <= 8% -> SolarCast_Predictor v1 promoted to Production

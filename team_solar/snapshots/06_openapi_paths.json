@@ -1,0 +1,29 @@
+{
+ "title": "SolarCast - 태양광 일 발전량 예측 Serving & AIOps",
+ "paths": {
+  "/predict": [
+   "post"
+  ],
+  "/predict/batch-test": [
+   "post"
+  ],
+  "/health": [
+   "get"
+  ],
+  "/data/upload": [
+   "post"
+  ],
+  "/data/window": [
+   "get"
+  ],
+  "/data/status": [
+   "get"
+  ],
+  "/logs": [
+   "get"
+  ],
+  "/logs/{filename}": [
+   "get"
+  ]
+ }
+}

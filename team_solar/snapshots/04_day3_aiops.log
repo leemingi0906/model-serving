@@ -1,0 +1,9 @@
+2026-10-01 03:08:24,331 [WARNING] [WARN] drift detected - triggering retrain
+2026-10-01 03:08:24,338 [INFO] [INFO] retrain triggered (window=last_30_days)
+2026-10-01 03:08:39,882 [INFO] [OK] new_nrmse=4.75% - production promoted: SolarCast_Predictor v2
+2026-10-01 03:12:21,897 [WARNING] [WARN] drift detected - triggering retrain
+2026-10-01 03:12:21,904 [INFO] [INFO] retrain triggered (window=last_30_days)
+2026-10-01 03:12:40,439 [INFO] [OK] new_nrmse=4.74% - production promoted: SolarCast_Predictor v3
+2026-10-01 03:13:21,784 [WARNING] [WARN] drift detected - triggering retrain
+2026-10-01 03:13:21,785 [INFO] [INFO] retrain triggered (window=last_30_days)
+2026-10-01 03:13:39,259 [INFO] [OK] new_nrmse=4.64% - production promoted: SolarCast_Predictor v4

@@ -1,0 +1,9 @@
+# 요청 (2026-08-17~08-30 실적 14일 -> 2026-08-31 예측, 실제 3597.0 kWh)
+{"sequence": [{"generation_kwh": 836.4}, {"generation_kwh": 3094.7}, {"generation_kwh": 3921.1}, {"generation_kwh": 4248.0}, {"generation_kwh": 3659.9}, {"generation_kwh": 4035.2}, {"generation_kwh": 4096.3}, {"generation_kwh": 4173.9}, {"generation_kwh": 4187.1}, {"generation_kwh": 3991.3}, {"generation_kwh": 3063.5}, {"generation_kwh": 684.7}, {"generation_kwh": 2506.2}, {"generation_kwh": 2947.6}]}
+
+# Day1 (MODEL_SOURCE=local)
+{"predicted_kwh":2978.3,"model_version":"v1-local"}
+# Day2 (MODEL_SOURCE=mlflow, v1 Production)
+{"predicted_kwh":2978.3,"model_version":"production-v1"}
+# Day3 드리프트 -> fine-tune -> v2 승격 후 같은 요청
+{"predicted_kwh":3191.5,"model_version":"production-v2"}

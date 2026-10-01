@@ -96,7 +96,7 @@ def main():
     #     · 지금 쓸 수 있는 변수: X, y, X_train, y_train, X_test, y_test, y_train_scaled
     #     · 시험용 데이터(X_test, y_test)가 학습에 섞이면 시험 점수(RMSE)는 믿을 수 있을까요?
     #     · 정답은 STEP 5에서 만든 y_train_scaled 와 원래 y_train 중 무엇이어야 할까요?
-    model.fit(___, ___, epochs=BASE_EPOCHS, verbose=0)
+    model.fit(X_train, y_train_scaled, epochs=BASE_EPOCHS, verbose=0)
 
     # STEP 7. 시험 보기 — 모델 출력(0~1)을 달러로 되돌린 뒤 실제 정답(y_test, 달러)과 비교
     preds_scaled = model.predict(X_test, verbose=0).flatten()

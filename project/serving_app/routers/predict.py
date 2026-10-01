@@ -82,10 +82,10 @@ def batch_test(req: BatchTestRequest):
         #     · 파이썬 슬라이싱 prices[a:b] 는 b 를 포함하나요?
         #     · 실제 값을 한 칸 앞(창문의 마지막 날)으로 잡으면, 모델은 무엇을 "맞힌" 셈이 될까요?
         #     · 반대로 창문을 한 칸 더 길게 잡아서 실제 값이 창문 안에 들어가면 RMSE는 어떻게 될까요?
-        window = prices[___ : ___]
+        window = prices[i : i + SEQ_LEN]
         sequence = [{"close": p, "volume": SIMULATED_VOLUME} for p in window]
         pred = model.predict_one(sequence)
-        actual = prices[___]
+        actual = prices[i + SEQ_LEN]
         predictions.append(pred)
         recent_predictions.append({"predicted": pred, "actual": actual})
 

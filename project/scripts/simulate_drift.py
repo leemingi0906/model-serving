@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data.features import load_rows
 from data.storage import latest_upload
 
-API_URL = "http://localhost:8000/predict/batch-test"
+API_URL = os.getenv("API_URL", "http://localhost:8000/predict/batch-test")
 
 
 def compute_baseline_stats(csv_path: str | None = None) -> tuple[float, float]:
@@ -59,14 +59,12 @@ def generate_drift_batch(n=BATCH_N, base=165.0, sigma=DRIFT_SIGMA):
 
 
 def send_batch(prices: np.ndarray, label: str) -> dict:
-    # TODO(Day3): 생성한 배치를 /predict/batch-test 엔드포인트에 순차(또는 일괄) 요청으로 전송하세요.
-    # 힌트:
-    # resp = requests.post(API_URL, json={"prices": prices.tolist()})
-    # resp.raise_for_status()
-    # result = resp.json()
-    # print(f"[{label}] drift_check = {result['drift_check']}")
-    # return result
-    raise NotImplementedError("send_batch를 구현하세요 (실습 4-2)")
+    """생성한 배치(41개 가격)를 /predict/batch-test 에 일괄 전송하고 드리프트 판정 결과를 출력한다."""
+    resp = requests.post(API_URL, json={"prices": prices.tolist()}, timeout=600)
+    resp.raise_for_status()
+    result = resp.json()
+    print(f"[{label}] drift_check = {result['drift_check']}")
+    return result
 
 
 def main():

@@ -71,7 +71,7 @@ class LoadedModel:
         #   생각해 볼 질문
         #     · 이 모델은 학습할 때 어떤 도구로 입력을 0~1로 바꿨을까요? (data/features.py 의 build_sequences 참고)
         #     · 서버에서 다른 방법으로 바꾸거나, 아예 안 바꾸고 넣으면 어떻게 될까요?
-        scaled = [self.scaler.___(p["close"], p["volume"]) for p in sequence]
+        scaled = [self.scaler.transform_point(p["close"], p["volume"]) for p in sequence]
 
         # ② 입력 모양 맞추기 — 모델은 "문제 여러 개"를 받으므로 1개라도 [ ]로 감쌉니다. (1, 20, 2)
         x = np.array([scaled], dtype="float32")  # (1, SEQ_LEN, 2)
@@ -85,7 +85,7 @@ class LoadedModel:
         #   생각해 볼 질문
         #     · pred_scaled 는 0.47 같은 값입니다. 이대로 응답하면 사용자는 무엇을 보게 될까요?
         #     · train_baseline_v1.py 의 STEP 7(시험 보기)에서는 예측값을 어떻게 처리했나요?
-        return self.scaler.___(pred_scaled)
+        return self.scaler.inverse_close(pred_scaled)
 
 
 # ═══════════════════════════════ 어디서 불러올까? ═══════════════════════════════
@@ -122,8 +122,27 @@ def _load_from_mlflow() -> LoadedModel:
     #     · 모델은 MLflow 에서 가져왔습니다. 스케일러도 MLflow 에서 가져와야 할까요, 로컬 scaler.pkl 을 써야 할까요?
     #     · Day2 모델은 어떤 스케일러로 0~1 변환한 데이터로 학습했나요? (train_and_register.py 의 SCALER_PATH 참고)
     #     · 스케일러를 여기서 새로 fit 하면 어떤 일이 생길까요?
-    scaler = ___
-    return LoadedModel(keras_model=keras_model, scaler=scaler, version="production")
+    scaler = HAICScaler.load(SCALER_PATH)  # 모델은 MLflow, 스케일러는 Day1에 fit한 로컬 파일 그대로
+    return LoadedModel(keras_model=keras_model, scaler=scaler, version=_production_version_label())
+
+
+def _production_version_label() -> str:
+    """재배포 확인용: 현재 Production 단계에 있는 레지스트리 버전 번호를 라벨에 붙인다 (예: production-v2)."""
+    try:
+        from mlflow.tracking import MlflowClient
+
+        versions = MlflowClient().get_latest_versions("HAIC_Predictor", stages=["Production"])
+        if versions:
+            return f"production-v{versions[0].version}"
+    except Exception:
+        pass
+    return "production"
+
+
+def invalidate_cache() -> None:
+    """Day3: 재학습으로 새 Production 이 승격되면 캐시를 비워, 다음 /predict 가 새 모델을 다시 불러오게 한다."""
+    global _model_cache
+    _model_cache = None
 
 
 def _load_model() -> LoadedModel:
@@ -164,8 +183,8 @@ def get_model() -> LoadedModel:
     #     · 상자가 비어 있다는 것은 코드로 어떻게 확인할까요? (파일 위쪽 _model_cache 의 처음 값)
     #     · 이 조건문 없이 매번 불러오면, 동작은 할까요? 요청이 초당 100건이면 어떻게 될까요?
     #     · 불러오는 함수는 load_eager() 가 무엇을 호출하는지 보면 알 수 있습니다.
-    if ___:
+    if _model_cache is None:
         start = time.time()
-        _model_cache = ___
+        _model_cache = _load_model()
         print(f"[lazy] model loaded in {time.time() - start:.3f}s on first request")
     return _model_cache

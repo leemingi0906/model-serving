@@ -55,8 +55,8 @@ def compute_rmse(recent_predictions: list[dict]) -> float:
     #   생각해 볼 질문
     #     · 이미 적힌 ** 2 를 빼고 오차를 그냥 평균 내면, 위 예시의 결과는 몇이 되나요? 그게 맞는 판단일까요?
     #     · 이미 적힌 math.sqrt 를 빼면 단위가 "달러"일까요, "달러²"일까요? 기준 $4.00 과 비교할 수 있을까요?
-    errors_sq = [(___) ** 2 for p in recent_predictions]
-    return math.sqrt(___)
+    errors_sq = [(p["actual"] - p["predicted"]) ** 2 for p in recent_predictions]
+    return math.sqrt(sum(errors_sq) / len(errors_sq))
 
 
 def is_drift(recent_predictions: list[dict]) -> bool:
@@ -70,7 +70,7 @@ def is_drift(recent_predictions: list[dict]) -> bool:
     #   생각해 볼 질문
     #     · 서버를 켜고 처음 3건만 들어왔는데 그중 1건이 크게 빗나갔다면, 재학습을 돌려야 할까요?
     #     · 판단에 필요한 최소 건수는 위에 어떤 이름의 상수로 정해져 있나요?
-    if ___:
+    if len(recent_predictions) < WINDOW_SIZE:
         return False  # 아직 판단할 만큼 데이터가 쌓이지 않음
     window = recent_predictions[-WINDOW_SIZE:]
     rmse = compute_rmse(window)

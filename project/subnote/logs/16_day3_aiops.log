@@ -1,0 +1,3 @@
+2026-10-01 02:57:27,127 [WARNING] [WARN] drift detected - triggering retrain
+2026-10-01 02:57:27,134 [INFO] [INFO] retrain triggered (window=last_21_days)
+2026-10-01 02:57:42,996 [INFO] [OK] new_rmse=1.47 - production promoted: HAIC_Predictor v2
