@@ -1,0 +1,86 @@
+[
+  {
+    "mode": "lazy",
+    "run": 1,
+    "startup": 0.30768824997358024,
+    "first": 4.149286084109917,
+    "second": 0.024223750224336982,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": false,
+      "loading_mode": "lazy"
+    },
+    "pred": 192.03,
+    "code": 200
+  },
+  {
+    "mode": "lazy",
+    "run": 2,
+    "startup": 0.25853854091838,
+    "first": 2.8562418341170996,
+    "second": 0.02215362503193319,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": false,
+      "loading_mode": "lazy"
+    },
+    "pred": 192.03,
+    "code": 200
+  },
+  {
+    "mode": "lazy",
+    "run": 3,
+    "startup": 0.2528953750152141,
+    "first": 2.333339124917984,
+    "second": 0.02545845787972212,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": false,
+      "loading_mode": "lazy"
+    },
+    "pred": 192.03,
+    "code": 200
+  },
+  {
+    "mode": "eager",
+    "run": 1,
+    "startup": 2.2671364159323275,
+    "first": 0.17188470787368715,
+    "second": 0.017867875052616,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": true,
+      "loading_mode": "eager"
+    },
+    "pred": 192.03,
+    "code": 200
+  },
+  {
+    "mode": "eager",
+    "run": 2,
+    "startup": 3.0945783329661936,
+    "first": 0.18003354198299348,
+    "second": 0.018475541844964027,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": true,
+      "loading_mode": "eager"
+    },
+    "pred": 192.03,
+    "code": 200
+  },
+  {
+    "mode": "eager",
+    "run": 3,
+    "startup": 3.103719542035833,
+    "first": 0.18529699998907745,
+    "second": 0.017469374928623438,
+    "health_at_start": {
+      "status": "ok",
+      "model_loaded": true,
+      "loading_mode": "eager"
+    },
+    "pred": 192.03,
+    "code": 200
+  }
+]

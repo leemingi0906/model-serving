@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>7. 통합 실습 - 메모 API</title>
+<style>
+  body { font-family: -apple-system, "맑은 고딕", sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 1.3rem; }
+  section { margin-bottom: 28px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+  label { display: block; font-size: 0.85rem; color: #555; margin-top: 8px; }
+  input, textarea { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-top: 2px; }
+  button { margin-top: 10px; padding: 8px 14px; cursor: pointer; }
+  #notes-list { font-size: 0.9rem; }
+  #notes-list li { margin-bottom: 4px; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>메모 API - 6개 문법 그룹 통합 실습</h1>
+  <p>이 페이지 자체가 <code>5. 앱 생명주기 & 정적 파일</code>의 결과물입니다. 아래 두 폼은 각각 <code>2-2. 요청 바디</code>와 <code>2-3. 파일 업로드</code>를 호출합니다.</p>
+
+  <section>
+    <h2>메모 작성 (POST /notes)</h2>
+    <label>제목</label>
+    <input id="title" placeholder="제목" />
+    <label>내용</label>
+    <textarea id="content" rows="2" placeholder="내용"></textarea>
+    <label>태그 (쉼표로 구분)</label>
+    <input id="tags" placeholder="예: 공부, fastapi" />
+    <button onclick="createNote()">저장</button>
+    <div id="create-result"></div>
+  </section>
+
+  <section>
+    <h2>파일로 메모 업로드 (POST /notes/upload)</h2>
+    <input type="file" id="file-input" accept=".txt" />
+    <button onclick="uploadNote()">업로드</button>
+    <div id="upload-result"></div>
+  </section>
+
+  <section>
+    <h2>메모 목록 (GET /notes)</h2>
+    <ul id="notes-list"></ul>
+  </section>
+
+<script>
+async function getJSON(path) {
+  const res = await fetch(path);
+  return { ok: res.ok, data: await res.json().catch(() => null) };
+}
+
+async function loadNotes() {
+  const { data } = await getJSON("/notes");
+  const el = document.getElementById("notes-list");
+  if (!data || !data.length) {
+    el.innerHTML = "<li>(아직 메모 없음)</li>";
+    return;
+  }
+  el.innerHTML = data.map((n) => `<li>#${n.id} ${n.title} (태그 ${n.tag_count}개)</li>`).join("");
+}
+
+async function createNote() {
+  const title = document.getElementById("title").value;
+  const content = document.getElementById("content").value;
+  const tags = document.getElementById("tags").value
+    .split(",").map((t) => t.trim()).filter(Boolean).map((name) => ({ name }));
+  const res = await fetch("/notes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, content, tags }),
+  });
+  const data = await res.json();
+  document.getElementById("create-result").textContent = res.ok
+    ? `저장됨: #${data.id}`
+    : `오류: ${JSON.stringify(data)}`;
+  loadNotes();
+}
+
+async function uploadNote() {
+  const input = document.getElementById("file-input");
+  if (!input.files.length) return;
+  const form = new FormData();
+  form.append("file", input.files[0]);
+  const res = await fetch("/notes/upload", { method: "POST", body: form });
+  const data = await res.json();
+  document.getElementById("upload-result").textContent = res.ok
+    ? `업로드됨: #${data.note_id} (${data.chars}자)`
+    : `오류: ${JSON.stringify(data)}`;
+  loadNotes();
+}
+
+loadNotes();
+</script>
+</body>
+</html>

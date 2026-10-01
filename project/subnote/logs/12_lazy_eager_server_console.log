@@ -1,0 +1,15 @@
+--- lazy run1 ---
+[lazy] 모델은 첫 /predict 요청이 들어올 때 로드됩니다.
+[lazy] model loaded in 4.010s on first request
+--- lazy run2 ---
+[lazy] 모델은 첫 /predict 요청이 들어올 때 로드됩니다.
+[lazy] model loaded in 2.740s on first request
+--- lazy run3 ---
+[lazy] 모델은 첫 /predict 요청이 들어올 때 로드됩니다.
+[lazy] model loaded in 2.208s on first request
+--- eager run1 ---
+[eager] model loaded in 2.087s at startup
+--- eager run2 ---
+[eager] model loaded in 2.712s at startup
+--- eager run3 ---
+[eager] model loaded in 2.756s at startup

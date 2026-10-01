@@ -1,0 +1,23 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# macOS / editors
+.DS_Store
+.vscode/
+
+# 실행 중 생성되는 것
+project/mlruns/
+project/mlflow.db
+project/logs/
+project/data/uploads/
+project/serving_app/models/*.keras
+project/serving_app/models/*.pkl
+
+# 비밀정보 (사이트 로그인 쿠키)
+team_solar/data_raw/ck.txt
+
+# 원본 HTML 덤프
+team_solar/data_raw/*.html

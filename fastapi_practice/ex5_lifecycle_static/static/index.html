@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>5. 앱 생명주기 & 정적 파일 실습</title>
+<style>
+  body { font-family: -apple-system, "맑은 고딕", sans-serif; max-width: 560px; margin: 60px auto; padding: 0 20px; }
+  h1 { font-size: 1.3rem; }
+  code { background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>이 페이지는 StaticFiles가 서빙하고 있습니다</h1>
+  <p>
+    <code>app.mount("/", StaticFiles(directory=..., html=True))</code> 덕분에
+    이 <code>index.html</code>이 <code>http://localhost:8000/</code>에서 그대로 보입니다.
+  </p>
+  <p>
+    <a href="/ping">/ping</a>을 눌러 API 엔드포인트도 같은 서버에서 정상 응답하는지 확인해보세요.
+  </p>
+</body>
+</html>

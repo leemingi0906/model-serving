@@ -1,0 +1,1 @@
+ValueError: File not found: filepath=serving_app/models/haic_v1.keras. Please ensure the file is an accessible `.keras` zip file.
