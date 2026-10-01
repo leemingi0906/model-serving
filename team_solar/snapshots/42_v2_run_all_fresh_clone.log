@@ -1,0 +1,30 @@
+# 새 클론에서 bash scripts/run_all.sh 로 처음부터 재현 (2026-10-01, 커밋 048d0c0)
+===== 0. 초기화 (이전 산출물 제거) =====
+===== 1. Day1 - 서버 기동(local) + 실적 업로드 =====
+===== 2. Day1 - baseline 학습 (수 분) =====
+===== 3. Day2 - MLflow 학습 + 제도 오차율 게이트 (수 분) =====
+[GATE PASSED] pass_rate_8=0.579 >= 0.45 (첫 배포 하한, mean_error=8.29%) -> SolarCast_Hourly v1 promoted to Production
+===== 4. Day2 - MLflow Production 으로 서빙 전환 =====
+===== 5. Day3 - 시나리오 7개 (합성 4 + 실제 3), 전 발전소 변화에서 fine-tuning 1~2분 =====
+[normal     ] samcheonpo_2   mean_error=7.17% pass8=0.7 PR=0.979  -> status=ok action=none
+[monsoon    ] samcheonpo_2   mean_error=9.19% pass8=0.381 PR=1.047  -> status=ok action=none
+[equipment  ] samcheonpo_2   mean_error=16.29% pass8=0.316 PR=0.66  -> status=equipment action=alert
+[real_gwangyang] gwangyang_1    mean_error=23.46% pass8=0.2 PR=0.238  -> status=equipment action=alert
+[real_sc2_dec] samcheonpo_2   mean_error=15.81% pass8=0.25 PR=0.797  -> status=equipment action=alert
+[real_yh5   ] yeongheung5_1  mean_error=11.69% pass8=0.333 PR=0.662  -> status=equipment action=alert
+[fleet_shift] samcheonpo_2   mean_error=12.22% pass8=0.35 PR=1.215  -> status=model_drift action=retrain
+[fleet_shift] samcheonpo_3   mean_error=13.61% pass8=0.1 PR=1.188  -> status=model_drift action=retrain
+[fleet_shift] gyeongsang_1   mean_error=14.22% pass8=0.053 PR=1.201  -> status=model_drift action=retrain retrain=True new_error=10.41
+===== 6. 결과 =====
+--- logs/aiops.log
+2026-10-01 14:18:16,789 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=1.0)
+2026-10-01 14:18:16,789 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
+2026-10-01 14:18:18,496 [WARNING] [WARN] drift detected (cause=equipment, plant=gwangyang_1, err=23.46% (thr 10.36%), pr_recent=0.443, pr_before=0.136, fleet_share=1.0)
+2026-10-01 14:18:18,496 [WARNING] [ALERT] equipment anomaly suspected at gwangyang_1 (PR 0.443) - retrain blocked, operator notified
+2026-10-01 14:18:20,391 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=15.81% (thr 10.36%), pr_recent=0.465, pr_before=0.963, fleet_share=1.0)
+2026-10-01 14:18:20,391 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.465) - retrain blocked, operator notified
+2026-10-01 14:18:22,218 [WARNING] [WARN] drift detected (cause=equipment, plant=yeongheung5_1, err=11.69% (thr 10.36%), pr_recent=0.678, pr_before=0.653, fleet_share=1.0)
+2026-10-01 14:18:22,218 [WARNING] [ALERT] equipment anomaly suspected at yeongheung5_1 (PR 0.678) - retrain blocked, operator notified
+2026-10-01 14:18:27,476 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=gyeongsang_1, err=14.22% (thr 10.36%), pr_recent=1.206, pr_before=1.199, fleet_share=1.0)
+2026-10-01 14:18:27,482 [INFO] [INFO] retrain triggered (window=last_30_days, plants=gyeongsang_1,samcheonpo_2,samcheonpo_3) - excluded low-PR plants: yeongheung5_1(PR 0.678)
+2026-10-01 14:18:42,962 [INFO] [OK] new_error=10.41% - production promoted: SolarCast_Hourly v2
