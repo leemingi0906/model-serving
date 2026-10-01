@@ -1,0 +1,9 @@
+2026-10-01 17:00:50,968 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=0.0)
+2026-10-01 17:00:50,968 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
+2026-10-01 17:00:57,357 [WARNING] [WARN] drift detected (cause=equipment, plant=yeongheung5_1, err=11.69% (thr 10.36%), pr_recent=0.678, pr_before=0.653, fleet_share=0.5)
+2026-10-01 17:00:57,357 [WARNING] [ALERT] equipment anomaly suspected at yeongheung5_1 (PR 0.678) - retrain blocked, operator notified
+2026-10-01 17:01:24,477 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=samcheonpo_2, err=12.92% (thr 10.36%), pr_recent=0.712, pr_before=0.75, fleet_share=0.67)
+2026-10-01 17:01:24,479 [INFO] [INFO] retrain triggered (window=last_30_days, plants=doosan_1,gyeongsang_1,samcheonpo_2,samcheonpo_3, job=345ed0baa11d)
+2026-10-01 17:01:41,314 [INFO] [OK] new_error=8.39% - production promoted: Haearim_Hourly v2
+2026-10-01 17:01:56,483 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=11.59% (thr 10.36%), pr_recent=0.574, pr_before=0.935, fleet_share=0.5)
+2026-10-01 17:01:56,484 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.574) - retrain blocked, operator notified
