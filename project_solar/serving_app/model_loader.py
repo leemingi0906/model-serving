@@ -41,7 +41,8 @@ class LoadedModel:
         out = self._keras_model.predict(
             [np.array([hist_cf], "float32"), np.array([future], "float32"), np.array([doy], "float32")], verbose=0
         )[0]
-        return [float(min(max(v, 0.0), 1.0)) for v in out]
+        # 태양고도(future 의 마지막 피처)가 0 인 시간 = 해가 없는 시간 -> 발전량 0 으로 마스킹 (sigmoid 바닥값 제거)
+        return [float(min(max(v, 0.0), 1.0)) if f[-1] > 0 else 0.0 for v, f in zip(out, future)]
 
     def predict_day(self, plant: dict, day: date, history_kwh: list[float], forecast_rows: list[list[float]]) -> list[float]:
         """
