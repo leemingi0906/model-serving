@@ -55,16 +55,19 @@ def check_and_trigger(plant_id: str) -> dict:
     # 재학습 대상: 오차가 큰 발전소 전부 (한 발전소만 보고 전체 모델을 고치지 않는다).
     # 단, 같은 시기에 PR 이 설비 이상 범위(< 0.75)인 발전소는 동시성 때문에 model_drift 로 묶여도 제외한다.
     # 고장 난 발전소 실적으로 fine-tune 하면 고장을 정상으로 학습하기 때문.
-    affected, excluded = {plant_id}, []
+    # 단, 저PR 발전소가 후보의 절반 이상이면 설비가 아니라 공통 원인(기후·제도 변화)이므로 전부 재학습에 넣는다.
+    candidates = {plant_id: c}
     for pid in records:
-        c2 = classify(pid)
-        if c2["status"] not in ("model_drift", "weather"):
+        if pid == plant_id:
             continue
-        if c2.get("pr_recent") is not None and c2["pr_recent"] < PR_EQUIPMENT:
-            excluded.append(f"{pid}(PR {c2['pr_recent']})")
-        else:
-            affected.add(pid)
-    affected = sorted(affected)
+        c2 = classify(pid)
+        if c2["status"] in ("model_drift", "weather"):
+            candidates[pid] = c2
+    low = {pid for pid, cc in candidates.items() if cc.get("pr_recent") is not None and cc["pr_recent"] < PR_EQUIPMENT}
+    if len(low) * 2 >= len(candidates):
+        low = set()  # 과반이 낮음 -> 공통 원인, 제외하지 않음
+    excluded = [f"{pid}(PR {candidates[pid]['pr_recent']})" for pid in sorted(low)]
+    affected = sorted(set(candidates) - low)
     logger.info(f"[INFO] retrain triggered (window=last_{FINE_TUNE_DAYS}_days, plants={','.join(affected)})"
                 + (f" - excluded low-PR plants: {', '.join(excluded)}" if excluded else ""))
 

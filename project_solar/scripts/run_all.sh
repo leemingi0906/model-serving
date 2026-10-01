@@ -37,7 +37,7 @@ MODEL_SOURCE=mlflow nohup $PY -m uvicorn serving_app.main:app --host 0.0.0.0 --p
 wait_health
 curl -s "localhost:$PORT/health"; echo
 
-step "5. Day3 - 시나리오 7개 (합성 4 + 실제 3), 전 발전소 변화에서 fine-tuning 1~2분"
+step "5. Day3 - 시나리오 9개 (합성 4 + 실제 3 + 기후 2), 폭염화·전 발전소 변화에서 fine-tuning 각 1~2분"
 $PY scripts/simulate_drift.py 2>&1 | grep -v "^I0000\|^WARNING\|oneDNN\|cuda\|AVX" | tee logs/simulate_drift_day3.log
 
 step "6. 결과"

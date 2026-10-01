@@ -9,7 +9,11 @@ Day3 드리프트 시뮬레이션 (SolarCast v2) - 실제 실적을 구간별로
     real_gwangyang 광양항 2025-10-05~ (PR 0.3 지속, 10/6~11 완전 정지)       equipment -> [ALERT]
     real_sc2_dec   삼천포2 2025-12-05~ (PR 0.96 -> 0.46 급락, 3주 뒤 복구)   equipment -> [ALERT]
     real_yh5       영흥#5 2026-08-11~ (2026-03 부터 PR 0.96 -> 0.64 점진 하락) equipment (장기 기록 있으면 soiling) -> [ALERT]
-    --- 마지막: 재학습이 일어나는 시나리오 (이후 Production 이 v2 로 바뀜) ---
+    --- 기후 변화 모의 (경남·경북 6곳 동시) ---
+    climate_wet    6곳 장마철 2026-06-20~ 그대로 (우기 패턴만, 관계 유지)      ok -> 모델이 아는 날씨, 재학습 없음
+    climate_heat   6곳 2026-07-11~ 관측기온 28°C 초과 1°C당 -5% (폭염화로 같은 일사량에서 발전 감소 = 관계 변화)
+                                                                      model_drift -> 재학습 -> 게이트 -> 재배포 (v2)
+    --- 마지막: 전 발전소 변화 (이후 Production 이 v3 로 바뀜) ---
     fleet_shift    발전소 3곳 최근 21일 x1.25 (전 발전소 동시 변화)   model_drift -> 재학습 -> 게이트 -> 재배포
 
 사전 준비: MODEL_SOURCE=mlflow uvicorn serving_app.main:app --port 8010 서버가 떠 있고, 실적이 업로드되어 있어야 한다.
@@ -27,6 +31,10 @@ BASE = os.getenv("API_BASE", "http://localhost:8010")
 N_DAYS = 21
 MONSOON_START = "2026-06-20"
 FLEET = ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1"]  # 경남 3곳: "같은 지역 발전소 동시 변화"
+CLIMATE_PLANTS = ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1", "doosan_1", "gumi_1", "yecheon_1"]  # 경남·경북 6곳
+CLIMATE_WET_START = "2026-06-20"   # 장마철 3주: 모델이 아는 우기 패턴
+CLIMATE_HEAT_START = "2026-07-11"  # 장마 직후 폭염 3주 (전 발전소 변화 창 08-11~ 과 겹치지 않게)
+HEAT_LOSS, HEAT_BASE = 0.05, 28.0  # 28°C 초과 1°C당 -5% (34°C 면 -30%). 더운 경남 4곳이 임계 초과, 경북 2곳은 이내
 
 
 def fetch_window(plant_id, **params):
@@ -50,7 +58,7 @@ def send(plant_id, label, records, persist=True, reset_state=True, check=True):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", default="normal,monsoon,equipment,fleet_shift,real_gwangyang,real_sc2_dec,real_yh5")
+    ap.add_argument("--only", default="normal,monsoon,equipment,real_gwangyang,real_sc2_dec,real_yh5,climate_wet,climate_heat,fleet_shift")
     args = ap.parse_args()
     run = set(args.only.split(","))
 
@@ -76,6 +84,18 @@ def main():
             w = fetch_window(pid, start=start)
             print(f"[실제] {desc}: {w['start']}~{w['end']}")
             send(pid, key, w["records"], persist=False)
+
+    if "climate_wet" in run:
+        print(f"[기후 A] 우기 패턴만 ({CLIMATE_WET_START}~, 6곳, 변형 없음): 모델이 아는 날씨 -> ok 기대")
+        for i, pid in enumerate(CLIMATE_PLANTS):
+            w = fetch_window(pid, start=CLIMATE_WET_START)
+            send(pid, "climate_wet", w["records"], persist=False, check=(i == len(CLIMATE_PLANTS) - 1))
+
+    if "climate_heat" in run:
+        print(f"[기후 B] 폭염화 ({CLIMATE_HEAT_START}~, 6곳, {HEAT_BASE}°C 초과 1°C당 -{HEAT_LOSS*100:.0f}%): 관계 변화 -> model_drift 기대")
+        for i, pid in enumerate(CLIMATE_PLANTS):
+            w = fetch_window(pid, start=CLIMATE_HEAT_START, heat_loss=HEAT_LOSS, heat_base=HEAT_BASE)
+            send(pid, "climate_heat", w["records"], check=(i == len(CLIMATE_PLANTS) - 1))
 
     if "fleet_shift" in run:
         print(f"[4] 전 발전소 변화(x1.25): {', '.join(FLEET)}")

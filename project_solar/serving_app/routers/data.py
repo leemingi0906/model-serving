@@ -94,16 +94,35 @@ def status():
 
 @router.get("/window")
 def window(plant_id: str, start: str | None = None, n_days: int = WINDOW_DAYS, scale: float = 1.0,
-           scale_from_day: int = 0):
+           scale_from_day: int = 0, heat_loss: float = 0.0, heat_base: float = 28.0):
     """
     시뮬레이션용 실적 구간: start 부터 n_days 일 + 앞 3일 이력 (총 n_days+3 일, 시간별).
       start 없음      -> 업로드 데이터의 마지막 n_days 일
       scale, scale_from_day -> (0-based) scale_from_day 번째 평가일부터 발전량에 scale 을 곱해 돌려줌
                               (설비 고장 = 0.5, 전 발전소 변화 = 1.25 등)
+      heat_loss, heat_base  -> 기후 변화(건기·폭염화) 모의: 관측 기온이 heat_base(°C) 를 1°C 넘을 때마다 발전량을
+                              heat_loss 만큼 더 깎음 (factor = 1 - heat_loss x max(0, T - heat_base), 하한 0.4).
+                              같은 일사량에서도 더운 시간대 발전이 과거보다 낮아진 "관계 변화"를 흉내낸다.
     """
-    gen = generation().get(plant_id)
+    generation()  # 캐시 갱신
+    gen = _gen_cache[1].get(plant_id) if _gen_cache else None  # 업로드 원본만: 운영 중 저장된(변형 주입된) recent 는 섞지 않는다 (시나리오 반복 시 중첩 방지)
     if not gen:
         raise HTTPException(400, f"'{plant_id}' 실적이 없습니다. 업로드를 확인하세요.")
+    wloc = None
+    if heat_loss > 0:
+        from serving_app.routers.predict import weather_obs  # 관측 기상 캐시 재사용
+        from data.features import WEATHER_SCALE, gen_time_to_weather_time
+        plant = load_plants().get(plant_id)
+        wloc = weather_obs().get(plant["loc"], {}) if plant else {}
+
+    def heat_factor(k: str) -> float:
+        if not wloc:
+            return 1.0
+        w = wloc.get(gen_time_to_weather_time(k))
+        if not w or w[2] != w[2]:  # 결측(nan)
+            return 1.0
+        t = w[2] * WEATHER_SCALE["temperature_2m"]
+        return max(0.4, 1.0 - heat_loss * max(0.0, t - heat_base))
     days = sorted({t[:10] for t in gen})
     if start:
         if start not in days:
@@ -116,9 +135,11 @@ def window(plant_id: str, start: str | None = None, n_days: int = WINDOW_DAYS, s
     sel = days[i - 3: i + n_days]
     records = []
     for j, ds in enumerate(sel):
-        f = scale if (j >= 3 + scale_from_day and scale != 1.0) else 1.0
+        inject = j >= 3 + scale_from_day
+        f = scale if (inject and scale != 1.0) else 1.0
         for k in hour_keys(date.fromisoformat(ds)):
             if k in gen:
-                records.append({"time": k, "generation_kwh": round(gen[k] * f, 3)})
+                fh = heat_factor(k) if (inject and heat_loss > 0) else 1.0
+                records.append({"time": k, "generation_kwh": round(gen[k] * f * fh, 3)})
     return {"plant_id": plant_id, "start": sel[3], "end": sel[-1], "n_days": n_days, "scale": scale,
-            "scale_from_day": scale_from_day, "records": records}
+            "scale_from_day": scale_from_day, "heat_loss": heat_loss, "heat_base": heat_base, "records": records}

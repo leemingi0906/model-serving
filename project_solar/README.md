@@ -16,7 +16,7 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 | 드리프트 | 오차 크면 재학습 | 21일 오차율 > 임계값(max(8%, 검증 오차×1.25)) 이면 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
 | 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포. 같은 시기에 PR < 0.75 인 발전소는 동시성에 묶여도 fine-tune 데이터에서 제외(고장을 정상으로 학습 방지) | `monitoring/retrain_trigger.py` |
 | 재학습 데이터 | 업로드 파일 마지막 41행 | 업로드 + 운영 중 수신한 실적(`data/recent/`) → 드리프트를 일으킨 데이터로 재학습 | `data/storage.py` |
-| 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) | `scripts/simulate_drift.py`, `/data/window` |
+| 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) + 실제 사례 3건 + 기후 변화 모의 2건(우기 패턴만 / 폭염화 관계 변화) | `scripts/simulate_drift.py`, `/data/window` |
 
 **지표 정의** (`data/metrics.py`): 시간별 오차율 = |예측−실제| ÷ 설비용량 × 100 (발전량이 용량 10% 이상인 시간만),
 일 오차율 = 그 평균, PR = 실제 일 발전량 ÷ 모델이 "그날 관측 기상"으로 낸 기대 발전량.
@@ -47,6 +47,14 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 | 광양항 2025-10-05~25 (PR 0.3 지속, 10/6~11 정지) | 23.5% | 0.44 | equipment → `[ALERT]` 재학습 차단 |
 | 삼천포2 2025-12-05~25 (12/16 급락, 1/9 복구) | 15.8% | 0.47 | equipment → `[ALERT]` |
 | 영흥#5 2026-08-11~31 (3월부터 점진 하락 0.96→0.64) | 11.7% | 0.68 | equipment → `[ALERT]` (60일+ 기록이면 soiling) |
+
+| 기후 변화 모의 (경남·경북 6곳, 21일) | 일 오차율 | PR | 판정 → 대응 |
+|---|---|---|---|
+| A. 우기 패턴만 (장마철 2026-06-20~, 변형 없음) | 6.9~9.2% | 0.98~1.11 | 6곳 모두 ok. 모델이 아는 날씨(입력 분포 변화)라 재학습 없음 |
+| B. 폭염화 관계 변화 (2026-07-20~, 관측기온 28°C 초과 1°C당 −2.5%) | 경남 4곳 11.4~16.0%, 경북 2곳 9.3~9.9% | 0.72~0.78 / 0.88~0.89 | 4곳 model_drift (동시성 0.67) → fine-tune(4곳, 30일) → 게이트 → **v2 승격**, 이후 전 발전소 변화에서 v3 |
+
+같은 20% 손실이라도 장마철 창에 넣으면 오차율이 8.5~9.2%에 그쳐 임계값(10.36%)을 넘지 않습니다. 제도 오차율은 설비용량 대비 절대 오차라서 흐린 날의 비례 손실은 작게 잡히기 때문입니다.
+기후 변화 시나리오를 폭염(맑은 날) 창에 둔 이유입니다. `/data/window?heat_loss=0.025&heat_base=28` 이 관측 기온으로 시간별 손실을 만듭니다.
 
 지난 1년 실제 데이터에서 발전소 10곳이 동시에 틀린 달은 없었습니다(월별 PR 중앙값 0.93~1.03). 즉 재학습이 필요한 모델 드리프트는 없었고
 이상은 전부 설비 문제였으며, 감지기는 세 건 모두 재학습을 막았습니다. 분석: `../team_solar/experiments/drift_analysis.py` (결과 JSON·로그 동봉).
@@ -82,7 +90,7 @@ python serving_app/train_and_register.py                         # MLflow 기록
 MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8010
 
 # --- Day3 ---
-python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 실제 사례 3건 → 전 발전소 변화(재학습, v2 승격)
+python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 실제 사례 3건 → 기후 A(우기) → 기후 B(폭염화, 재학습 v2) → 전 발전소 변화(재학습 v3)
 cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 ```
 
@@ -100,5 +108,5 @@ cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 
 - [x] `/data/upload` 로 시간별 실적을 올리면 `/data/status` 에 발전소 10곳·기간이 보이는가
 - [x] Day2 게이트: 테스트 1년 8% 통과율 0.579 ≥ 0.45 로 Production v1 승격 (persistence 16.0% / GHI 선형 12.0% → 8.29%)
-- [x] 장마철은 ok, 설비 고장은 `[ALERT]` 만 남고 재학습 차단, 전 발전소 변화만 `[INFO] retrain triggered` → `[OK]`
+- [x] 장마철·우기 패턴은 ok, 설비 고장·실제 사례 3건은 `[ALERT]` 만 남고 재학습 차단, 폭염화 관계 변화와 전 발전소 변화만 `[INFO] retrain triggered` → `[OK]`
 - [x] 재배포 후 `/predict` 의 `model_version` 이 `production-v2` 로 바뀜

@@ -168,6 +168,10 @@
       <button class="btn secondary" onclick="sendBatch('real_sc2_dec')">삼천포2 2025-12 (급락)</button>
       <button class="btn secondary" onclick="sendBatch('real_yh5')">영흥#5 2026-08 (점진 하락)</button>
     </div>
+    <div class="btn-row">
+      <button class="btn secondary" onclick="sendBatch('climate_wet')">기후 A: 우기 패턴만 (6곳, 2026-06-20~)</button>
+      <button class="btn danger" onclick="sendBatch('climate_heat')">기후 B: 폭염화 관계 변화 (6곳, 28°C↑ 1°C당 −5%)</button>
+    </div>
     <div id="drift-status" style="margin-top:14px;"></div>
     <div id="drift-result" class="result-box"></div>
   </div>
@@ -235,6 +239,8 @@ const BATCHES = {
   real_gwangyang: { label: "광양항 2025-10 실제", runs: [{ plant: "gwangyang_1", query: "&start=2025-10-05", persist: false }] },
   real_sc2_dec:   { label: "삼천포2 2025-12 실제", runs: [{ plant: "samcheonpo_2", query: "&start=2025-12-05", persist: false }] },
   real_yh5:       { label: "영흥#5 2026-08 실제", runs: [{ plant: "yeongheung5_1", query: "&start=2026-08-11", persist: false }] },
+  climate_wet:    { label: "기후 A: 우기 패턴만 (6곳)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1", "doosan_1", "gumi_1", "yecheon_1"].map(p => ({ plant: p, query: "&start=2026-06-20", persist: false })) },
+  climate_heat:   { label: "기후 B: 폭염화 관계 변화 (6곳)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1", "doosan_1", "gumi_1", "yecheon_1"].map(p => ({ plant: p, query: "&start=2026-07-11&heat_loss=0.05&heat_base=28", persist: true })) },
 };
 const STATUS_LABEL = {
   ok: "정상 (21일 오차율 ≤ 임계값)", insufficient: "판단 보류 (기록 7일 미만)",

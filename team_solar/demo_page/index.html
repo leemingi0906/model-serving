@@ -204,6 +204,7 @@ ul { margin: 8px 0 0; padding-left: 20px; } li { margin-top: 4px; }
       <tr><td>Concept drift (관계 변화)</td><td>P(Y|X)가 바뀜</td><td>여러 발전소가 동시에 "같은 날씨에 다른 발전량"</td><td>경남 3곳 ×1.25 (합성)</td><td>fine-tune → 게이트 → 재배포 (유일한 재학습 경로)</td></tr>
       <tr><td>Target 이상 (정답 쪽 문제)</td><td>특정 대상의 실제값이 비정상</td><td>고장·인버터 탈락·오염</td><td>광양항(정지), 삼천포2(계단), 영흥#5(점진)</td><td>알림·현장 점검, 재학습 금지</td></tr>
       <tr><td>Training-serving skew</td><td>학습·운영 입력 품질 차이</td><td>학습은 관측 기상, 서빙은 D-1 예보</td><td>8.29% → 9.85%</td><td>드리프트 아님, 예보 입력 학습으로 개선 과제</td></tr>
+      <tr><td>기후 변화 (건기·우기화) 모의</td><td>새 패턴이 21일 이상 지속</td><td>A. 우기 패턴만: 6곳 장마철 실적 그대로 / B. 폭염화: 관측기온 28°C 초과 1°C당 −2.5% 손실</td><td>A. 오차 6.9~9.2%, PR 0.98~1.11 / B. 경남 4곳 11.4~16.0%, PR 0.72~0.78</td><td>A. ok (모델이 아는 날씨) / B. 4곳 동시 model_drift → fine-tune → v2. 같은 손실을 장마 창에 넣으면 오차 8.5~9.2%로 임계값 미달</td></tr>
     </tbody>
   </table></div>
   <div class="tablewrap"><table>
