@@ -51,10 +51,16 @@ def fetch(kind: str, lat: float, lon: float, start: str, end: str) -> list[dict]
         "hourly": ",".join(hourly),
         "timezone": "Asia/Seoul",
     }
-    for attempt in range(5):
-        r = requests.get(SOURCES[kind], params=params, timeout=120)
-        if r.status_code == 429:  # rate limit
-            time.sleep(10 * (attempt + 1))
+    for attempt in range(6):
+        try:
+            r = requests.get(SOURCES[kind], params=params, timeout=180)
+        except (requests.ConnectionError, requests.Timeout) as e:  # 서버가 연결을 끊거나 응답이 늦을 때
+            print(f"    연결 오류({e.__class__.__name__}), {15 * (attempt + 1)}초 후 재시도 {attempt + 1}/6")
+            time.sleep(15 * (attempt + 1))
+            continue
+        if r.status_code in (429, 500, 502, 503, 504):  # rate limit / 서버 일시 오류
+            print(f"    HTTP {r.status_code}, {15 * (attempt + 1)}초 후 재시도 {attempt + 1}/6")
+            time.sleep(15 * (attempt + 1))
             continue
         r.raise_for_status()
         js = r.json()
