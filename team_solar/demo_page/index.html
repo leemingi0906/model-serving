@@ -194,6 +194,31 @@ ul { margin: 8px 0 0; padding-left: 20px; } li { margin-top: 4px; }
   <p class="note">세 건 모두 "재학습하면 안 되는" 경우이고 감지기도 그렇게 판정했습니다. 이 결과로 규칙 두 개를 고쳤습니다. 창 시작 전에 이미 떨어져 하락폭이 안 보이는 경우도 PR이 0.75 아래면 설비 이상으로 보고, 발전소 동시성은 같은 시기(±7일) 기록만 묶습니다. 영흥#5처럼 수개월에 걸친 하락을 "점진 손실"로 가르려면 21일 창이 아니라 누적 기록이 필요해서 60일 이상 쌓이면 보는 장기 추세 규칙을 추가했습니다.</p>
 </div>
 
+<div class="panel" id="drift-guide">
+  <h3>발표용: 드리프트를 어떻게 설명할까</h3>
+  <p class="note">핵심 메시지는 하나입니다. <b>오차가 커졌다 ≠ 모델이 틀렸다.</b> 태양광에서 오차가 커지는 원인은 날씨·설비·모델 셋이고, 구분하지 않고 재학습하면 고장 난 발전소를 정상으로 학습합니다(광양항 복구 후 PR 1.2가 그 증거).</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>교과서 분류 (Gama 2014)</th><th>뜻</th><th>태양광에서</th><th>우리 사례</th><th>대응</th></tr></thead>
+    <tbody>
+      <tr><td>Data drift (입력 분포 변화)</td><td>P(X)만 바뀜</td><td>장마철·폭염 등 기상 분포</td><td>장마철 PR 1.05, 오차 9.2%</td><td>재학습 불필요, 모델이 기상 입력으로 흡수</td></tr>
+      <tr><td>Concept drift (관계 변화)</td><td>P(Y|X)가 바뀜</td><td>여러 발전소가 동시에 "같은 날씨에 다른 발전량"</td><td>경남 3곳 ×1.25 (합성)</td><td>fine-tune → 게이트 → 재배포 (유일한 재학습 경로)</td></tr>
+      <tr><td>Target 이상 (정답 쪽 문제)</td><td>특정 대상의 실제값이 비정상</td><td>고장·인버터 탈락·오염</td><td>광양항(정지), 삼천포2(계단), 영흥#5(점진)</td><td>알림·현장 점검, 재학습 금지</td></tr>
+      <tr><td>Training-serving skew</td><td>학습·운영 입력 품질 차이</td><td>학습은 관측 기상, 서빙은 D-1 예보</td><td>8.29% → 9.85%</td><td>드리프트 아님, 예보 입력 학습으로 개선 과제</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>변화의 모양</th><th>형태</th><th>우리 사례</th><th>구분 신호</th></tr></thead>
+    <tbody>
+      <tr><td>Sudden</td><td>하루 만에 계단형</td><td>삼천포2 12/16 PR 0.96 → 0.46</td><td>최근 7일 PR &lt; 0.75, 급락 플래그 → equipment</td></tr>
+      <tr><td>Incremental</td><td>몇 달에 걸쳐 한 방향</td><td>영흥#5 3→8월 0.96 → 0.64</td><td>60일+ 단조 하락 → soiling, 같은 부지 영흥2 정상 → 날씨 아님</td></tr>
+      <tr><td>Recurring</td><td>바뀌었다가 복귀</td><td>광양항 11월 복구, 삼천포2 1/9 복구</td><td>복구 후 PR이 1.0으로 돌아오면 설비였다는 사후 확인</td></tr>
+      <tr><td>동시 변화</td><td>절반 이상 발전소가 같은 방향</td><td>지난 1년 실제로는 없음 (월별 중앙값 0.93~1.03)</td><td>±7일 동시성 ≥ 50% 또는 PR &gt; 1.15 → model_drift</td></tr>
+    </tbody>
+  </table></div>
+  <figure><img src="img/41_drift_cases_pr.png" alt="실제 드리프트 사례 3건의 일별 PR과 10곳 월별 PR 중앙값" style="width:100%;height:auto"><figcaption>일별 PR로 본 세 사례의 모양(정지·계단·점진)과 10곳 월별 중앙값. 빨간 점선이 equipment 판정선 0.75</figcaption></figure>
+  <p class="note">판정 순서: ① 21일 오차율 &gt; 10.36%? → ② 다른 발전소도 동시에? 그러면 model_drift·재학습 → ③ 60일+ 단조 하락? soiling → ④ 최근 7일 PR &lt; 0.75? equipment → ⑤ 완만 하락? soiling, 아니면 weather. 업계 대응물: IEC 61724-1의 Performance Ratio·soiling ratio, NREL RdTools의 톱니(SRR) 오염 추정. PSI·KS 같은 입력 분포 지표는 계절 변화를 전부 드리프트로 잡아 쓰지 않았습니다. 전체 정리와 예상 질문: 저장소 <code>team_solar/DRIFT_GUIDE.md</code>, 그림 <code>team_solar/snapshots/41_v2_drift_cases_pr.png</code>.</p>
+</div>
+
 <h2 id="log">5. aiops.log</h2>
 <p class="section-lead">일곱 시나리오를 순서대로 돌렸을 때 남은 로그입니다. 전 발전소 변화만 재학습으로 이어지고, 합성 고장 1건과 실제 사례 3건은 알림으로 끝납니다.</p>
 <pre class="log" id="aiops"></pre>

@@ -10,7 +10,7 @@ PORT="${PORT:-8010}"
 PY="${PYTHON:-python3}"
 
 step() { echo; echo "===== $* ====="; }
-wait_health() { for i in $(seq 1 60); do curl -sf "localhost:$PORT/health" >/dev/null && return 0; sleep 1; done; echo "서버가 뜨지 않았습니다"; exit 1; }
+wait_health() { for i in $(seq 1 240); do curl -sf "localhost:$PORT/health" >/dev/null && return 0; sleep 1; done; echo "서버가 240초 안에 뜨지 않았습니다 (logs/server_*.log 확인)"; exit 1; }
 stop_server() { pkill -f "uvicorn serving_app.main:app.*--port $PORT" 2>/dev/null || true; sleep 1; }
 
 step "0. 초기화 (이전 산출물 제거)"

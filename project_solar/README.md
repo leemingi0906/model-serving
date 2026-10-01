@@ -51,6 +51,8 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 지난 1년 실제 데이터에서 발전소 10곳이 동시에 틀린 달은 없었습니다(월별 PR 중앙값 0.93~1.03). 즉 재학습이 필요한 모델 드리프트는 없었고
 이상은 전부 설비 문제였으며, 감지기는 세 건 모두 재학습을 막았습니다. 분석: `../team_solar/experiments/drift_analysis.py` (결과 JSON·로그 동봉).
 
+발표용 드리프트 설명(분류·사례·판정 트리·예상 질문): `../team_solar/DRIFT_GUIDE.md`, 그림 `../team_solar/snapshots/41_v2_drift_cases_pr.png`.
+
 재배포 후 `/predict`: production-v1 → production-v2. 로그·캡처: `../team_solar/snapshots/3*_v2_*`, `2*_v2_*.png`.
 
 ## 실행 순서 (포트 8010)
