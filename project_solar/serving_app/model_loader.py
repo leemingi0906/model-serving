@@ -1,5 +1,5 @@
 """
-[Day1 -> Day2] 모델 불러오기 - serving_app/model_loader.py (SolarCast v2)
+[Day1 -> Day2] 모델 불러오기 - serving_app/model_loader.py (해아림 v2)
 
 환경변수
    LOADING_MODE = lazy(기본) | eager
@@ -15,7 +15,7 @@ from serving_app import lstm_model  # noqa: F401  (커스텀 손실 daytime_weig
 
 LOCAL_MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"
-MODEL_NAME = "SolarCast_Hourly"
+MODEL_NAME = "Haearim_Hourly"
 ALIAS = "champion"  # MLflow Registry alias (stage 는 폐기 예정이라 alias 로 운영 모델을 가리킨다)
 MLFLOW_MODEL_URI = f"models:/{MODEL_NAME}@{ALIAS}"
 

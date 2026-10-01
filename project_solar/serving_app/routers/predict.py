@@ -1,5 +1,5 @@
 """
-[Day1 -> Day3] 예측 API - serving_app/routers/predict.py (SolarCast v2)
+[Day1 -> Day3] 예측 API - serving_app/routers/predict.py (해아림 v2)
 
    POST /predict             : 발전소 1곳, 다음 날 24시간 발전량 (제도 제출 포맷)
    POST /predict/batch-test  : 시간별 실적을 받아 날짜별로 사후 평가 -> 오차율·PR 기록 -> 드리프트 원인 분류 -> 대응

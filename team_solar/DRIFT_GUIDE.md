@@ -1,6 +1,6 @@
 # 드리프트 설명 가이드 (발표용)
 
-SolarCast 발표에서 "드리프트"를 설명할 때 쓰는 개념 정리, 우리 데이터에서 찾은 실제 사례, 판정 방법, 발표 흐름.
+해아림 발표에서 "드리프트"를 설명할 때 쓰는 개념 정리, 우리 데이터에서 찾은 실제 사례, 판정 방법, 발표 흐름.
 그림: `snapshots/41_v2_drift_cases_pr.png` (실제 사례 3건 + 10곳 월별 PR), 수치 근거: `experiments/drift_analysis.json`, `project_solar/logs/aiops.log`.
 
 ## 1. 한 문장 정의와 핵심 메시지

@@ -1,5 +1,5 @@
 """
-Day2: MLflow 로 SolarCast v2 모델을 학습 -> 기록 -> 게이트 검증 -> 등록 -> Production 승격.
+Day2: MLflow 로 해아림 v2 모델을 학습 -> 기록 -> 게이트 검증 -> 등록 -> Production 승격.
 Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 fine-tuning.
 
 게이트 (기획안 "지표 하나로 통일")
@@ -36,7 +36,7 @@ SEED = 42
 keras.utils.set_random_seed(SEED)
 
 GATE_MIN_PASS_RATE = 0.45  # 첫 배포 하한: 기준선(전날 그대로 0.30 / 일사량 선형 0.30) x 1.5
-MODEL_NAME = "SolarCast_Hourly"
+MODEL_NAME = "Haearim_Hourly"
 ALIAS = "champion"
 LOCAL_MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"

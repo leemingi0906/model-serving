@@ -1,4 +1,4 @@
-# SolarCast v2 - 태양광 시간별 발전량 예측 B2B 서비스 (조별과제)
+# 해아림 v2 - 태양광 시간별 발전량 예측 B2B 서비스 (조별과제)
 
 HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위에, 발전소 통합 시간별 모델과
 드리프트 **원인 분류** 기반 대응을 얹은 버전입니다. 기획안: https://claude.ai/code/artifact/99cef027-f8a6-4d2a-81ec-aefc85a12335
@@ -6,7 +6,7 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 
 ## HAIC 실습 → v2 에서 바뀐 것
 
-| 항목 | HAIC (`project/`) | SolarCast v2 | 파일 |
+| 항목 | HAIC (`project/`) | 해아림 v2 | 파일 |
 |---|---|---|---|
 | 예측 대상 | 다음 날 종가 1개 | 다음 날 **24시간** 발전량 (제도 제출 포맷) | `schemas.py`, `lstm_model.py` |
 | 입력 | 최근 20일 (close, volume) | 과거 72h 이용률 + 내일 24h 기상(일사·운량·기온) + 태양고도 + 날짜 | `data/features.py`, `data/solar.py` |

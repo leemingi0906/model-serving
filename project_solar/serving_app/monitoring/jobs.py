@@ -1,5 +1,5 @@
 """
-[Day3] 재학습 백그라운드 작업 - serving_app/monitoring/jobs.py (SolarCast v2)
+[Day3] 재학습 백그라운드 작업 - serving_app/monitoring/jobs.py (해아림 v2)
 
 재학습(fine-tuning 1~2분)을 요청 스레드에서 돌리면 그동안 /predict 가 멈춘다. 그래서
   - 작업은 워커 1개짜리 스레드 풀에서 돌리고, 요청은 바로 {"job_id", "status": "queued"} 를 받는다.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SolarCast v2 전체 루프를 한 번에 재현한다 (Day1 baseline -> Day2 MLflow 게이트 -> Day3 시나리오 7개).
+# 해아림 v2 전체 루프를 한 번에 재현한다 (Day1 baseline -> Day2 MLflow 게이트 -> Day3 시나리오 7개).
 #   cd project_solar && bash scripts/run_all.sh
 # 산출물: logs/*.log, logs/aiops.log, serving_app/models/*, mlruns/, 마지막에 서버는 8010 포트에 떠 있는 상태로 둔다.
 # CPU 기준 20~30분. 중간에 실패하면 그 단계에서 멈춘다 (set -e).

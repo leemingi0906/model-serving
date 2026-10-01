@@ -1,5 +1,5 @@
 """
-SolarCast v2 - 다음 날 24시간 이용률을 한 번에 출력하는 모델 (Day1 baseline 과 Day2 MLflow 학습이 공유).
+해아림 v2 - 다음 날 24시간 이용률을 한 번에 출력하는 모델 (Day1 baseline 과 Day2 MLflow 학습이 공유).
 
     hist (72, 1)  --LSTM(32, return_sequences)--LSTM(16)--+
     future (24, 4) --Flatten--Dense(48, relu)------------+--concat--Dense(64, relu)--Dense(24, sigmoid)

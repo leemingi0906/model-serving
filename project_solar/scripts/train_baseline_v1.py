@@ -1,5 +1,5 @@
 """
-[Day1 사전 준비] SolarCast v2 로컬 baseline 모델 만들기 - scripts/train_baseline_v1.py
+[Day1 사전 준비] 해아림 v2 로컬 baseline 모델 만들기 - scripts/train_baseline_v1.py
 
 서버가 읽어 갈 파일 2개:
    serving_app/models/scaler.pkl           <- 정규화 상수 (Day1~3 공유)

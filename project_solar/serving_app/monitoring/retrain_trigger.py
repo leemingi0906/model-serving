@@ -1,5 +1,5 @@
 """
-[Day3] 드리프트 -> 원인별 대응 - serving_app/monitoring/retrain_trigger.py (SolarCast v2)
+[Day3] 드리프트 -> 원인별 대응 - serving_app/monitoring/retrain_trigger.py (해아림 v2)
 
 logs/aiops.log 에 남는 줄 (대시보드가 읽으므로 앞머리 토큰은 바꾸지 말 것)
     ok          : (기록 없음)
@@ -8,7 +8,7 @@ logs/aiops.log 에 남는 줄 (대시보드가 읽으므로 앞머리 토큰은 
     soiling     : [WARN] drift detected (cause=soiling, ...)    +  [ALERT] soiling suspected ... - cleaning recommended
     model_drift : [WARN] drift detected - triggering retrain
                   [INFO] retrain triggered (window=last_30_days, plants=..., job=...)
-                  [OK] new_error=4.12% - production promoted: SolarCast_Hourly v2     (또는 게이트 실패 [WARN])
+                  [OK] new_error=4.12% - production promoted: Haearim_Hourly v2     (또는 게이트 실패 [WARN])
 
 재학습은 백그라운드 작업(monitoring/jobs.py)으로 돈다. 요청은 job_id 를 받고 바로 끝나며, 학습 중에도
 /predict 는 기존 Production 으로 응답한다. RETRAIN_MODE=sync 면 요청 안에서 끝까지 기다린다 (스크립트·테스트용).
@@ -56,7 +56,7 @@ def _retrain_job(affected: list[str], start: str, end: str) -> dict:
 
     result = fine_tune(affected, start, end)
     if result.get("promoted"):
-        logger.info(f"[OK] new_error={result['mean_error']:.2f}% - production promoted: SolarCast_Hourly v{result['version']}")
+        logger.info(f"[OK] new_error={result['mean_error']:.2f}% - production promoted: Haearim_Hourly v{result['version']}")
         model_loader.invalidate_cache()
         for pid in affected:  # 새 모델 기준으로 다시 쌓기 시작
             records[pid].clear()

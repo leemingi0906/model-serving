@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>SolarCast · 태양광 발전량 예측 AIOps</title>
+<title>해아림 · 태양광 발전량 예측 AIOps</title>
 <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <style>
   :root {
@@ -25,6 +25,18 @@
     --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, sans-serif;
   }
+  /* 라이트 테마 (발표·인쇄용): 상단 버튼 또는 ?theme=light. localStorage 에 기억 */
+  :root[data-theme="light"] {
+    --bg: #f6f7fb; --panel: #ffffff; --panel-2: #f0f2f7; --border: #dde2ec;
+    --text: #1a1f2b; --muted: #5b6478; --faint: #8a93a6;
+    --accent: #3b5bdb; --accent-soft: rgba(59, 91, 219, 0.12);
+    --ok: #1b9e6a; --ok-soft: rgba(27, 158, 106, 0.12);
+    --warn: #b8781b; --warn-soft: rgba(184, 120, 27, 0.14);
+    --err: #d64545; --err-soft: rgba(214, 69, 69, 0.12);
+  }
+  :root[data-theme="light"] .btn.primary, :root[data-theme="light"] .btn.danger { color: #ffffff; }
+  :root[data-theme="light"] .brand-mark svg path { stroke: #ffffff; }
+  :root[data-theme="light"] .card { box-shadow: 0 1px 3px rgba(20, 30, 60, 0.06); }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
 
@@ -117,12 +129,13 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#0a0c10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <div class="brand-text">
-      <div class="title">SolarCast · 태양광</div>
+      <div class="title">해아림 · 태양광</div>
       <div class="subtitle">v2 · 시간별 통합 모델 · 드리프트 원인 분류 기반 대응</div>
     </div>
   </div>
   <div class="nav-right">
     <span class="pill neutral" id="health-badge">MODEL_SOURCE=mlflow 기준</span>
+    <button class="btn secondary" id="theme-toggle" onclick="toggleTheme()" style="margin-left:8px;padding:6px 10px;">라이트</button>
   </div>
 </div>
 
@@ -208,7 +221,7 @@
 
 </div>
 
-<footer>SolarCast v2 · 태양광 시간별 발전량 예측 B2B 서비스 데모 (HAIC 실습 구조 재사용 · serving_app/static/index.html)</footer>
+<footer>해아림 v2 · 태양광 시간별 발전량 예측 B2B 서비스 데모 (HAIC 실습 구조 재사용 · serving_app/static/index.html)</footer>
 
 <script>
 /* ===================== 전역 상태 ===================== */
@@ -445,6 +458,20 @@ async function refreshHealth() {
   const t = h.data.training === "running" || h.data.training === "queued" ? ` · 재학습 ${h.data.training}` : "";
   el.innerHTML = `<span class="pill ${t ? "warn" : "ok"}"><span class="dot"></span>서버 정상 · 모델 ${v}${t}</span>`;
 }
+/* ===================== 테마 ===================== */
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  const b = document.getElementById("theme-toggle");
+  if (b) b.textContent = t === "light" ? "다크" : "라이트";
+  try { localStorage.setItem("theme", t); } catch (e) {}
+}
+function toggleTheme() { applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"); }
+(function () {
+  const q = new URLSearchParams(location.search).get("theme");
+  let saved = null; try { saved = localStorage.getItem("theme"); } catch (e) {}
+  applyTheme(q || saved || "dark");
+})();
+
 async function init() {
   renderPipeline();
   loadLogFiles();

@@ -1,5 +1,5 @@
 """
-[Day3] 드리프트 감지 + 원인 분류 - serving_app/monitoring/drift_detector.py (SolarCast v2)
+[Day3] 드리프트 감지 + 원인 분류 - serving_app/monitoring/drift_detector.py (해아림 v2)
 
 HAIC 실습은 "오차 크면 드리프트 -> 재학습" 한 가지였다. v2 는 두 지표를 같이 본다.
     오차율  : 모델이 틀리고 있나          (최근 21일 일 오차율 평균 > 임계값 = max(8%, 검증 오차 x 1.25))

@@ -1,5 +1,5 @@
 """
-SolarCast v2 발전 실적 업로드 / 상태 / 시뮬레이션용 구간 조회 (routers/data.py)
+해아림 v2 발전 실적 업로드 / 상태 / 시뮬레이션용 구간 조회 (routers/data.py)
 
 업로드 CSV 컬럼: plant_id, time('YYYY-MM-DD HH:00', HH=01..24), generation_kwh.  .csv 또는 .csv.gz
 기상(관측 obs, 하루 전 예보 d1)과 발전소 레지스트리는 data/ 에 동봉되어 있어 업로드하지 않는다.
