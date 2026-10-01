@@ -68,7 +68,7 @@ def compute_window_error(plant_id: str) -> float | None:
     return _mean([r["day_error"] for r in window(plant_id)])
 
 
-def fleet_share_over_threshold(ref_date: str | None = None) -> tuple[float, int]:
+def fleet_share_over_threshold(ref_date: str | None = None) -> tuple[float, int, int]:
     """
     같은 시기(ref_date 기준 ±FLEET_DATE_TOLERANCE 일 안에 최근 기록이 있는) 발전소 중 창 오차가 임계값을 넘는 비율.
     시기가 다른 기록(예: 작년 가을 광양항, 올여름 영흥)을 한데 묶으면 "동시 변화"가 아니므로 날짜로 거른다.
@@ -83,7 +83,7 @@ def fleet_share_over_threshold(ref_date: str | None = None) -> tuple[float, int]
         n += 1
         if compute_window_error(pid) > error_threshold():
             over += 1
-    return (over / n if n else 0.0), n
+    return (over / n if n else 0.0), n, over
 
 
 def _days_between(a: str, b: str) -> int:
@@ -123,7 +123,7 @@ def classify(plant_id: str) -> dict:
     pr_recent = _mean(prs[-PR_RECENT_DAYS:]) if prs else None
     pr_before = _mean(prs[:-PR_RECENT_DAYS]) if len(prs) > PR_RECENT_DAYS + 2 else None
     pr_window = _mean(prs) if prs else None
-    share, n_plants = fleet_share_over_threshold(ref_date=w[-1]["date"])
+    share, n_plants, n_over = fleet_share_over_threshold(ref_date=w[-1]["date"])
     trend = long_trend(plant_id)
     thr = error_threshold()
     out.update(window_error=round(err, 2), threshold=thr, pr_recent=None if pr_recent is None else round(pr_recent, 3),
@@ -137,7 +137,8 @@ def classify(plant_id: str) -> dict:
 
     drop = (pr_before - pr_recent) if (pr_before is not None and pr_recent is not None) else None
     # 1) 같은 시기 여러 발전소가 동시에 틀리거나, 실제가 기대치를 계속 크게 웃돌면 -> 모델이 세상을 못 따라가는 것
-    if (n_plants >= 2 and share >= FLEET_SHARE) or (pr_window is not None and pr_window > PR_FLEET_HIGH):
+    # 동시 변화 = 같은 시기 발전소 중 절반 이상, 그리고 이 발전소 말고도 최소 한 곳 더 (2곳뿐일 때 한 곳만 틀린 것을 동시로 보지 않음)
+    if (n_over >= 2 and share >= FLEET_SHARE) or (pr_window is not None and pr_window > PR_FLEET_HIGH):
         out.update(status="model_drift", action="retrain")
     # 2) 장기 기록이 있고 PR 이 수개월에 걸쳐 단조 하락 -> 오염·열화·점진적 설비 손실 (재학습 금지)
     elif trend and trend["gradual"] and trend["pr_first30"] - trend["pr_recent"] >= PR_SOILING_DROP \

@@ -22,6 +22,7 @@ Day3 드리프트 시뮬레이션 (SolarCast v2) - 실제 실적을 구간별로
 import argparse
 import os
 import sys
+import time
 
 import requests
 
@@ -43,6 +44,28 @@ def fetch_window(plant_id, **params):
     return r.json()
 
 
+def wait_job(timeout=1800):
+    """재학습은 백그라운드 작업이라 끝날 때까지 /jobs/current 를 본다 (학습 중에도 /predict 는 응답한다)."""
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        j = requests.get(f"{BASE}/jobs/current", timeout=30).json()
+        if j.get("status") not in ("queued", "running"):
+            return j
+        time.sleep(2)
+    raise TimeoutError("재학습 작업이 끝나지 않습니다 (/jobs/current 확인)")
+
+
+def _retrain_text(d):
+    r = d.get("retrain")
+    if not r:
+        return ""
+    if r.get("job_id") and r.get("status") in ("queued", "running"):
+        j = wait_job()
+        res = j.get("result") or {}
+        r.update(res, status=j.get("status"))
+    return f" retrain={r.get('promoted')} new_error={r.get('mean_error')} (job {r.get('job_id')})"
+
+
 def send(plant_id, label, records, persist=True, reset_state=True, check=True):
     r = requests.post(f"{BASE}/predict/batch-test",
                       json={"plant_id": plant_id, "label": label, "records": records, "persist": persist,
@@ -50,12 +73,11 @@ def send(plant_id, label, records, persist=True, reset_state=True, check=True):
     r.raise_for_status()
     res = r.json()
     s, d = res["summary"], res["drift_check"]
-    print(f"[{label:11s}] {plant_id:<14} mean_error={s['mean_error']}% pass8={s['pass_rate_8']} PR={s['pr_mean']}  "
-          f"-> status={d.get('status')} action={d.get('action')}"
-          + (f" retrain={d['retrain'].get('promoted')} new_error={d['retrain'].get('mean_error')}" if "retrain" in d else "")
+    d1 = f" d1_error={s['d1_mean_error']}% gap={s['forecast_gap_mean']}%" if s.get("d1_mean_error") is not None else ""
+    print(f"[{label:11s}] {plant_id:<14} mean_error={s['mean_error']}% pass8={s['pass_rate_8']} PR={s['pr_mean']}{d1}  "
+          f"-> status={d.get('status')} action={d.get('action')}" + _retrain_text(d)
           + (f"\n{'':14s} -> fleet_trigger via {d['fleet_trigger']['plant_id']}: status={d['fleet_trigger'].get('status')}"
-             + (f" retrain={d['fleet_trigger']['retrain'].get('promoted')} new_error={d['fleet_trigger']['retrain'].get('mean_error')}" if "retrain" in d["fleet_trigger"] else "")
-             if "fleet_trigger" in d else ""))
+             + _retrain_text(d["fleet_trigger"]) if "fleet_trigger" in d else ""))
     return res
 
 

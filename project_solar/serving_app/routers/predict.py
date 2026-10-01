@@ -8,17 +8,19 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
 
-from data.features import HIST_HOURS, HORIZON, hour_keys, build_future, load_weather, WEATHER_OBS_PATH, WEATHER_SCALE
+from data.features import HIST_HOURS, HORIZON, hour_keys, build_future, load_weather, WEATHER_OBS_PATH, WEATHER_D1_PATH, WEATHER_SCALE
 from data.metrics import day_error_rate, performance_ratio, summarize
 from data.storage import append_recent
 from serving_app import model_loader
 from serving_app.schemas import (PredictRequest, PredictResponse, BatchTestRequest, BatchTestResponse, DayResult)
+from serving_app.monitoring import jobs
 from serving_app.monitoring.drift_detector import records
 from serving_app.monitoring.retrain_trigger import check_and_trigger
 
 router = APIRouter()
 
 _weather_obs: dict | None = None
+_weather_d1: dict | None = None
 
 
 def weather_obs() -> dict:
@@ -26,6 +28,24 @@ def weather_obs() -> dict:
     if _weather_obs is None:
         _weather_obs = load_weather(WEATHER_OBS_PATH)
     return _weather_obs
+
+
+def weather_d1() -> dict:
+    """하루 전 예보 (서빙 조건). 없으면 빈 dict -> d1 지표는 생략된다."""
+    global _weather_d1
+    if _weather_d1 is None:
+        try:
+            _weather_d1 = load_weather(WEATHER_D1_PATH)
+        except OSError:
+            _weather_d1 = {}
+    return _weather_d1
+
+
+def forecast_gap_pct(future_obs: list[list[float]], future_d1: list[list[float]]) -> float:
+    """낮 시간(태양고도 > 0) 관측 일사량과 D-1 예보 일사량의 평균 차이, 1000 W/m2 대비 % (예보가 얼마나 빗나갔나)."""
+    ghi_scale = WEATHER_SCALE["shortwave_radiation"]
+    diffs = [abs(o[0] - f[0]) * ghi_scale for o, f in zip(future_obs, future_d1) if o[-1] > 0]
+    return round(sum(diffs) / len(diffs) / 1000 * 100, 2) if diffs else 0.0
 
 
 def _resolve_plant(plant_id: str, capacity_kw=None, lat=None, lon=None) -> dict:
@@ -67,6 +87,7 @@ def batch_test(req: BatchTestRequest):
     plant = _resolve_plant(req.plant_id)
     model = model_loader.get_model()
     wloc = weather_obs().get(plant["loc"], {})
+    wloc_d1 = weather_d1().get(plant["loc"], {})
     cap = plant["capacity_kw"]
 
     if req.reset_state:
@@ -95,10 +116,19 @@ def batch_test(req: BatchTestRequest):
         expected = [c * cap for c in cf]
         err = day_error_rate(expected, actual, cap)
         pr = performance_ratio(actual, expected, cap)
-        records[req.plant_id].append({"date": ds, "day_error": err, "pr": pr, "label": req.label})
+        # 서빙 조건(하루 전 예보 입력)의 오차와 예보 괴리 - 감시 보조 지표 (판정 규칙은 관측 기상 기준을 유지)
+        d1_err, gap = None, None
+        future_d1 = build_future(plant, d, wloc_d1) if wloc_d1 else None
+        if future_d1 is not None:
+            cf_d1 = model.predict_cf(hist, future_d1, doy_features(d), req.plant_id)
+            d1_err = day_error_rate([c * cap for c in cf_d1], actual, cap)
+            gap = forecast_gap_pct(future, future_d1)
+        records[req.plant_id].append({"date": ds, "day_error": err, "pr": pr, "label": req.label,
+                                      "d1_error": d1_err, "forecast_gap": gap})
         results.append(DayResult(date=ds, actual_kwh=round(sum(actual), 1), expected_kwh=round(sum(expected), 1),
                                  day_error=None if err is None else round(err, 2),
-                                 pr=None if pr is None else round(pr, 3)))
+                                 pr=None if pr is None else round(pr, 3),
+                                 d1_error=None if d1_err is None else round(d1_err, 2), forecast_gap=gap))
 
     if not results:
         raise HTTPException(400, "평가할 수 있는 날이 없습니다 (이력 72시간 + 그날 24시간 + 기상이 모두 있어야 합니다).")
@@ -108,6 +138,10 @@ def batch_test(req: BatchTestRequest):
 
     summary = summarize([r.day_error for r in results])
     summary["pr_mean"] = round(sum(r.pr for r in results if r.pr is not None) / max(1, sum(1 for r in results if r.pr is not None)), 3)
+    d1 = summarize([r.d1_error for r in results if r.d1_error is not None])
+    summary["d1_mean_error"], summary["d1_pass_rate_8"] = d1.get("mean_error"), d1.get("pass_rate_8")
+    gaps = [r.forecast_gap for r in results if r.forecast_gap is not None]
+    summary["forecast_gap_mean"] = round(sum(gaps) / len(gaps), 2) if gaps else None
     if req.check:
         drift_check = check_and_trigger(req.plant_id)
         if drift_check["status"] in ("ok", "insufficient"):
@@ -133,6 +167,12 @@ def batch_test(req: BatchTestRequest):
         drift_check["deferred"] = True
     drift_check["label"] = req.label
     return BatchTestResponse(plant_id=req.plant_id, label=req.label, days=results, summary=summary, drift_check=drift_check)
+
+
+@router.get("/jobs/current")
+def current_job():
+    """재학습 백그라운드 작업 상태 (idle / queued / running / completed / failed)"""
+    return jobs.job_status()
 
 
 @router.get("/predict/drift-state")

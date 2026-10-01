@@ -386,24 +386,49 @@ async function sendBatch(kind) {
       all.push({ plant: run.plant, summary: data.summary, drift_check: data.drift_check });
     }
 
-    lastPipelineRun = { driftCheck: data.drift_check || {}, ts: Date.now() / 1000 };
+    // 배치 마지막 발전소는 정상이어도 같은 시기의 다른 발전소가 동시 변화면 fleet_trigger 에 그 판정이 들어온다
+    let check = (data.drift_check && data.drift_check.fleet_trigger) || data.drift_check || {};
+    const s = data.summary || {};
+    const renderStatus = () => {
+      let level = (check.action === "retrain") ? (check.retrain && check.retrain.promoted ? "ok" : "warn")
+                : (check.action === "alert" ? "warn" : "ok");
+      let label = STATUS_LABEL[check.status] || check.status;
+      if (check.status === "model_drift" && check.retrain) {
+        const r = check.retrain;
+        if (r.status === "queued" || r.status === "running") {
+          label += ` · 재학습 백그라운드 작업 진행 중 (job ${r.job_id}, 대상 ${(r.plants || []).join(", ")}) — 학습 중에도 /predict 는 기존 버전으로 응답`;
+          level = "warn";
+        } else if (r.promoted) {
+          label += ` · 재학습 완료, 새 버전 승격 (new_error=${Number(r.mean_error).toFixed(2)}%)`;
+        } else {
+          label += ` · 재학습했지만 게이트 미통과 (new_error=${r.mean_error}) — 기존 버전 유지`;
+        }
+      }
+      const d1 = s.d1_mean_error != null ? ` · D-1 예보 입력 오차 ${s.d1_mean_error}% · 예보 괴리 ${s.forecast_gap_mean}%` : "";
+      statusEl.innerHTML = `
+        <span class="pill ${level}"><span class="dot"></span>${label}</span>
+        <span class="pill neutral" style="margin-left:6px;">${data.plant_id} · ${win.data.start} ~ ${win.data.end} · 일 오차율 평균 ${s.mean_error}% · 8% 통과율 ${s.pass_rate_8} · PR ${s.pr_mean}${d1} · 창(21일) 오차 ${check.window_error ?? "-"}% / 임계값 ${check.threshold ?? "-"}%</span>`;
+    };
+    lastPipelineRun = { driftCheck: check, ts: Date.now() / 1000 };
     renderPipeline();
     loadLogFiles();
-
-    const check = data.drift_check || {};
-    const s = data.summary || {};
-    let level = (check.action === "retrain") ? (check.retrain && check.retrain.promoted ? "ok" : "warn")
-              : (check.action === "alert" ? "warn" : "ok");
-    let label = STATUS_LABEL[check.status] || check.status;
-    if (check.status === "model_drift" && check.retrain) {
-      label += check.retrain.promoted
-        ? ` · 재학습 완료, 새 버전 승격 (new_error=${check.retrain.mean_error?.toFixed?.(2)}%)`
-        : ` · 재학습했지만 게이트 미통과 (new_error=${check.retrain.mean_error})`;
-    }
-    statusEl.innerHTML = `
-      <span class="pill ${level}"><span class="dot"></span>${label}</span>
-      <span class="pill neutral" style="margin-left:6px;">${data.plant_id} · ${win.data.start} ~ ${win.data.end} · 일 오차율 평균 ${s.mean_error}% · 8% 통과율 ${s.pass_rate_8} · PR ${s.pr_mean} · 창(21일) 오차 ${check.window_error ?? "-"}% / 임계값 ${check.threshold ?? "-"}%</span>`;
+    renderStatus();
     showResult(resultBox, batch.runs.length > 1 ? all : data, false);
+
+    // 재학습이 백그라운드로 걸렸으면 끝날 때까지 /jobs/current 를 보고 파이프라인·로그를 갱신한다
+    if (check.retrain && check.retrain.job_id && (check.retrain.status === "queued" || check.retrain.status === "running")) {
+      for (let i = 0; i < 600; i++) {
+        await new Promise(r => setTimeout(r, 2000));
+        const j = await getJSON("/jobs/current");
+        if (!j.ok) continue;
+        if (j.data.job_id === check.retrain.job_id && j.data.status !== "queued" && j.data.status !== "running") {
+          check.retrain = { ...check.retrain, ...(j.data.result || {}), status: j.data.status };
+          lastPipelineRun = { driftCheck: check, ts: Date.now() / 1000 };
+          renderPipeline(); loadLogFiles(); renderStatus(); refreshHealth();
+          break;
+        }
+      }
+    }
   } catch (e) {
     statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>연결 실패</span>`;
     showResult(resultBox, "요청 실패: " + e.message, true);
@@ -411,9 +436,20 @@ async function sendBatch(kind) {
 }
 
 /* ===================== 초기화 ===================== */
+async function refreshHealth() {
+  const el = document.getElementById("health-badge");
+  if (!el) return;
+  const h = await getJSON("/health");
+  if (!h.ok) { el.innerHTML = `<span class="pill err"><span class="dot"></span>서버 연결 안 됨</span>`; return; }
+  const v = h.data.model_version || (h.data.model_loaded ? "loaded" : "lazy (첫 요청 때 로드)");
+  const t = h.data.training === "running" || h.data.training === "queued" ? ` · 재학습 ${h.data.training}` : "";
+  el.innerHTML = `<span class="pill ${t ? "warn" : "ok"}"><span class="dot"></span>서버 정상 · 모델 ${v}${t}</span>`;
+}
 async function init() {
   renderPipeline();
   loadLogFiles();
+  refreshHealth();
+  setInterval(refreshHealth, 5000);
 }
 init();
 </script>

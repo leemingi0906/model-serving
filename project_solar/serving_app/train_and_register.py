@@ -11,8 +11,9 @@ Day3: 드리프트 감지 후 Production 가중치에서 이어서 학습하는 
     승격 시 serving_app/models/production_metrics.json 에 검증 수치를 남기고, 드리프트 임계값은 그 수치에서 유도한다.
 
 실행:
-    python scripts/train_baseline_v1.py      # 최초 1회 (scaler.pkl)
-    python serving_app/train_and_register.py
+    python scripts/train_baseline_v1.py                       # 최초 1회 (scaler.pkl + solarcast_v2.keras, CPU 수 분)
+    python serving_app/train_and_register.py                  # 처음부터 학습 -> 게이트 -> 등록 (CPU 10분 안팎)
+    python serving_app/train_and_register.py --register-local # 동봉된 로컬 모델을 학습 없이 평가·게이트·등록 (1~2분)
 """
 import os
 import sys
@@ -36,6 +37,8 @@ keras.utils.set_random_seed(SEED)
 
 GATE_MIN_PASS_RATE = 0.45  # 첫 배포 하한: 기준선(전날 그대로 0.30 / 일사량 선형 0.30) x 1.5
 MODEL_NAME = "SolarCast_Hourly"
+ALIAS = "champion"
+LOCAL_MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"
 PRODUCTION_METRICS_PATH = "serving_app/models/production_metrics.json"
 TEST_SPLIT = "2025-09-01"  # 예측일 기준: 이전 = 학습, 이후 = 테스트 (최근 1년)
@@ -72,7 +75,7 @@ def evaluate(model, Xh, Xf, Xd, Xp, Y, meta, plants) -> dict:
 def load_production_model():
     """현재 Production 모델 (없으면 None)"""
     try:
-        return mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
+        return mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}@{ALIAS}")
     except Exception:
         return None
 
@@ -102,7 +105,7 @@ def _save_production_metrics(version, metrics: dict, mode: str):
 
 def _promote(run_id: str, metrics: dict, mode: str, result: dict, reason: str) -> dict:
     v = mlflow.register_model(f"runs:/{run_id}/model", MODEL_NAME)
-    MlflowClient().transition_model_version_stage(name=MODEL_NAME, version=v.version, stage="Production")
+    MlflowClient().set_registered_model_alias(MODEL_NAME, ALIAS, v.version)  # 운영 모델 = @champion
     result.update(promoted=True, version=v.version)
     _save_production_metrics(v.version, metrics, mode)
     print(f"[GATE PASSED] {reason} -> {MODEL_NAME} v{v.version} promoted to Production")
@@ -188,7 +191,7 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
     split = days[int(len(days) * 0.8)]
     tr, te = split_by_date(meta, split)
 
-    model = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
+    model = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}@{ALIAS}")
     champion_m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
     model.compile(optimizer=keras.optimizers.Adam(learning_rate=FINE_TUNE_LR), loss=daytime_weighted_mae)
 
@@ -208,5 +211,32 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
         return _register_finetune_if_better(mlflow.active_run().info.run_id, m, champion_m)
 
 
+def register_local() -> dict:
+    """
+    학습 없이 동봉된 로컬 모델(scripts/train_baseline_v1.py 산출물)을 같은 테스트 1년으로 평가하고
+    같은 게이트를 거쳐 MLflow 에 등록·승격한다. 팀원 PC 에서 10분 학습을 건너뛰고 Day2 상태로 가기 위한 경로.
+    """
+    SolarScaler.load(SCALER_PATH)
+    plants, gen, weather = load_training_sources(with_recent=False)
+    Xh, Xf, Xd, Xp, Y, meta = build_dataset(plants, gen, weather)
+    tr, te = split_by_date(meta, TEST_SPLIT)
+    champion = load_production_model()
+    champion_m = evaluate(champion, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants) if champion else None
+    model = keras.models.load_model(LOCAL_MODEL_PATH)
+    with mlflow.start_run(run_name="register-local"):
+        m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
+        mlflow.log_param("mode", "register-local")
+        mlflow.log_param("source", LOCAL_MODEL_PATH)
+        mlflow.log_param("n_test", len(te))
+        mlflow.log_param("plants", ",".join(sorted(gen)))
+        _log_metrics("test_", m)
+        mlflow.tensorflow.log_model(model, name="model")
+        print(f"register-local: {m}")
+        return _register_if_gate_passed(mlflow.active_run().info.run_id, m, champion_m)
+
+
 if __name__ == "__main__":
-    train_and_register()
+    if "--register-local" in sys.argv:
+        register_local()
+    else:
+        train_and_register()

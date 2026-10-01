@@ -12,9 +12,12 @@ HAIC 실습 스켈레톤(`../project/`)의 서빙 → MLOps → AIOps 루프 위
 | 입력 | 최근 20일 (close, volume) | 과거 72h 이용률 + 내일 24h 기상(일사·운량·기온) + 태양고도 + 날짜 | `data/features.py`, `data/solar.py` |
 | 단위 | 달러 | 이용률 = kWh ÷ 설비용량 → 발전소 10곳을 한 모델로 | `data/plants.csv` |
 | 데이터 | 가상 시세 756행 | 실제 실적 10곳 × 3.7년 시간별(32만 행) + Open-Meteo 기상 | `data/sample_solar_hourly.csv.gz`, `data/weather/` |
+| 모델 레지스트리 | stage=Production | alias `@champion` (stage 는 폐기 예정). 동봉 모델은 `--register-local` 로 학습 없이 같은 게이트를 거쳐 등록 | `train_and_register.py`, `model_loader.py` |
+| 감시 보조 지표 | 없음 | 같은 날을 **하루 전 예보**로 예측한 오차(`d1_error`, 서빙 조건)와 **예보 괴리**(낮 시간 관측-예보 일사량 차이)를 함께 기록 | `routers/predict.py` |
+| 업로드 검증 | 없음 | 컬럼·time 형식·중복·미등록 발전소·범위(용량 105%) 검사 후 거부, 계약 테스트 13개 | `routers/data.py`, `tests/` |
 | 게이트 | RMSE ≤ $4 | **제도 오차율 8% 통과율**(일 오차율 ≤ 8%인 날의 비율): 첫 배포는 ≥ 0.45(기준선 0.30×1.5), 이후는 현 Production 이상(챔피언/챌린저). fine-tune은 같은 held-out 날짜에서 현 Production보다 평균 오차가 낮을 때만 | `train_and_register.py`, `data/metrics.py` |
 | 드리프트 | 오차 크면 재학습 | 21일 오차율 > 임계값(max(8%, 검증 오차×1.25)) 이면 성능비 PR + 발전소 동시성으로 **원인 분류** → ok / weather / equipment / soiling / model_drift | `monitoring/drift_detector.py` |
-| 대응 | 재학습 1종 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포. 같은 시기에 PR < 0.75 인 발전소는 동시성에 묶여도 fine-tune 데이터에서 제외(고장을 정상으로 학습 방지) | `monitoring/retrain_trigger.py` |
+| 대응 | 재학습 1종, 요청 안에서 동기 실행 | 날씨·설비·오염 = 알림(재학습 금지), 모델 드리프트만 최근 30일 fine-tuning → 게이트 → 재배포. 재학습은 **백그라운드 작업**(`/jobs/current`, 중복 요청 합침)으로 돌아 학습 중에도 `/predict` 는 기존 버전으로 응답. 같은 시기에 PR < 0.75 인 발전소는 동시성에 묶여도 fine-tune 데이터에서 제외(고장을 정상으로 학습 방지) | `monitoring/retrain_trigger.py` |
 | 재학습 데이터 | 업로드 파일 마지막 41행 | 업로드 + 운영 중 수신한 실적(`data/recent/`) → 드리프트를 일으킨 데이터로 재학습 | `data/storage.py` |
 | 시나리오 | 랜덤워크 변동성 3배 | 실제 실적 구간: 정상 / 장마철 / 설비 고장(×0.5) / 전 발전소 변화(×1.25) + 실제 사례 3건 + 기후 변화 모의 2건(우기 패턴만 / 폭염화 관계 변화) | `scripts/simulate_drift.py`, `/data/window` |
 
@@ -65,11 +68,19 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 
 ## 실행 순서 (포트 8010)
 
-한 번에 전부 돌리려면 (CPU 20~30분, 끝나면 서버가 떠 있는 상태):
+팀원 빠른 시작 (동봉 모델 등록, 학습 없음, 3~5분) - 자세한 안내는 `TEAM_GUIDE.md`:
 
 ```bash
 cd project_solar
 pip install -r requirements.txt
+bash scripts/quick_start.sh          # 업로드 -> 동봉 모델 평가·게이트·MLflow 등록 -> 서버 기동
+python scripts/simulate_drift.py     # 시나리오 9개 (재학습 2회는 백그라운드 작업, 자동 대기)
+python -m pytest -q                  # 계약 테스트 13개 (TensorFlow 없이 0.5초)
+```
+
+처음부터 전부 학습하려면 (CPU 20~30분):
+
+```bash
 bash scripts/run_all.sh
 ```
 

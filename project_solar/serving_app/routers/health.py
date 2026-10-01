@@ -8,11 +8,15 @@ router = APIRouter()
 
 @router.get("/health")
 def health():
+    from serving_app.monitoring import jobs
+
     model_loaded = model_loader._model_cache is not None
     return {
         "status": "ok",
         "model_loaded": model_loaded,
+        "model_version": model_loader.current_version(),
         "loading_mode": _current_loading_mode(),
+        "training": jobs.job_status().get("status", "idle"),
     }
 
 

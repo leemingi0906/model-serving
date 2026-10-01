@@ -57,6 +57,8 @@ class DayResult(BaseModel):
     expected_kwh: float
     day_error: float | None
     pr: float | None
+    d1_error: float | None = Field(None, description="같은 날을 하루 전 예보 입력으로 예측했을 때의 일 오차율 (서빙 조건)")
+    forecast_gap: float | None = Field(None, description="낮 시간 관측-예보 일사량 평균 차이 (1000 W/m2 대비 %)")
 
 
 class BatchTestResponse(BaseModel):

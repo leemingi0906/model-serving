@@ -20,6 +20,7 @@ from serving_app.monitoring.drift_detector import WINDOW_DAYS
 router = APIRouter(prefix="/data")
 
 REQUIRED_COLUMNS = {"plant_id", "time", "generation_kwh"}
+TIME_RE = __import__("re").compile(r"^\d{4}-\d{2}-\d{2} (0[1-9]|1\d|2[0-4]):00$")
 MIN_ROWS = HIST_HOURS + HORIZON * WINDOW_DAYS  # 한 발전소가 드리프트 판정까지 가는 데 필요한 최소 시간 수
 
 _gen_cache: tuple[str, dict] | None = None
@@ -49,20 +50,36 @@ async def upload(file: UploadFile = File(...)):
     reader = csv.DictReader(io.StringIO(text))
     if not REQUIRED_COLUMNS.issubset(set(reader.fieldnames or [])):
         raise HTTPException(400, f"CSV에 {sorted(REQUIRED_COLUMNS)} 컬럼이 모두 있어야 합니다.")
-    n, bad = 0, 0
+    n, bad, bad_time, unknown, dup = 0, 0, 0, set(), 0
     plants = load_plants(PLANTS_PATH)
+    seen: set[tuple[str, str]] = set()
     for r in reader:
         n += 1
+        if not TIME_RE.match(r["time"] or ""):
+            bad_time += 1
+            continue
+        key = (r["plant_id"], r["time"])
+        if key in seen:  # 같은 발전소·시각 중복 = 원본 문제. 조용히 평균 내지 않고 거부한다
+            dup += 1
+        seen.add(key)
         try:
             v = float(r["generation_kwh"])
         except ValueError:
             bad += 1
             continue
         p = plants.get(r["plant_id"])
-        if v < 0 or (p and v > p["capacity_kw"] * 1.05):  # 용량의 105% 초과 = 계측 오류 -> 거부 (데이터 오류는 모델까지 안 감)
+        if p is None:
+            unknown.add(r["plant_id"])
+        if v != v or v < 0 or (p and v > p["capacity_kw"] * 1.05):  # NaN/음수/용량 105% 초과 = 계측 오류 -> 거부
             bad += 1
     if n < MIN_ROWS:
         raise HTTPException(400, f"최소 {MIN_ROWS}행 이상의 데이터가 필요합니다.")
+    if bad_time:
+        raise HTTPException(400, f"time 형식 오류 {bad_time}행 - 'YYYY-MM-DD HH:00' (HH=01..24, 구간 끝 시각) 이어야 합니다.")
+    if dup:
+        raise HTTPException(400, f"발전소·시각 중복 {dup}행 - 원본에서 중복을 정리한 뒤 올리세요.")
+    if unknown:
+        raise HTTPException(400, f"data/plants.csv 에 없는 발전소: {sorted(unknown)[:5]} - 레지스트리를 먼저 갱신하세요.")
     if bad > n * 0.01:
         raise HTTPException(400, f"범위 밖 값이 {bad}행({bad / n:.1%}) - 설비용량 초과/음수/비수치. 파일을 확인하세요.")
 

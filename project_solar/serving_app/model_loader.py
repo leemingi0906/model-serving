@@ -16,7 +16,8 @@ from serving_app import lstm_model  # noqa: F401  (커스텀 손실 daytime_weig
 LOCAL_MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"
 MODEL_NAME = "SolarCast_Hourly"
-MLFLOW_MODEL_URI = f"models:/{MODEL_NAME}/Production"
+ALIAS = "champion"  # MLflow Registry alias (stage 는 폐기 예정이라 alias 로 운영 모델을 가리킨다)
+MLFLOW_MODEL_URI = f"models:/{MODEL_NAME}@{ALIAS}"
 
 _model_cache = None
 _plants_cache: dict | None = None
@@ -77,9 +78,8 @@ def _production_version_label() -> str:
     try:
         from mlflow.tracking import MlflowClient
 
-        versions = MlflowClient().get_latest_versions(MODEL_NAME, stages=["Production"])
-        if versions:
-            return f"production-v{versions[0].version}"
+        v = MlflowClient().get_model_version_by_alias(MODEL_NAME, ALIAS)
+        return f"production-v{v.version}"
     except Exception:
         pass
     return "production"
@@ -104,10 +104,19 @@ def load_eager() -> LoadedModel:
     return model
 
 
+_lock = __import__("threading").RLock()
+
+
 def get_model() -> LoadedModel:
+    """서빙 스냅샷. 재학습 스레드가 돌아도 요청은 이 객체로 계속 응답하고, 승격 뒤 첫 요청이 새 모델을 불러온다."""
     global _model_cache
-    if _model_cache is None:
-        start = time.time()
-        _model_cache = _load_model()
-        print(f"[lazy] model loaded in {time.time() - start:.3f}s on first request")
-    return _model_cache
+    with _lock:
+        if _model_cache is None:
+            start = time.time()
+            _model_cache = _load_model()
+            print(f"[lazy] model loaded in {time.time() - start:.3f}s on first request")
+        return _model_cache
+
+
+def current_version() -> str | None:
+    return _model_cache.version if _model_cache is not None else None

@@ -6,3 +6,4 @@ tensorflow==2.21.0
 mlflow==3.16.0
 requests==2.33.1
 python-multipart==0.0.20
+pytest==8.3.4
