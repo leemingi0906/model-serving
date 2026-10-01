@@ -1,0 +1,46 @@
+# 새 클론에서 bash scripts/run_all.sh 로 처음부터 재현, 시나리오 9개 (2026-10-01)
+===== 0. 초기화 (이전 산출물 제거) =====
+===== 1. Day1 - 서버 기동(local) + 실적 업로드 =====
+===== 2. Day1 - baseline 학습 (수 분) =====
+===== 3. Day2 - MLflow 학습 + 제도 오차율 게이트 (수 분) =====
+[GATE PASSED] pass_rate_8=0.579 >= 0.45 (첫 배포 하한, mean_error=8.29%) -> SolarCast_Hourly v1 promoted to Production
+===== 4. Day2 - MLflow Production 으로 서빙 전환 =====
+===== 5. Day3 - 시나리오 9개 (합성 4 + 실제 3 + 기후 2), 폭염화·전 발전소 변화에서 fine-tuning 각 1~2분 =====
+[normal     ] samcheonpo_2   mean_error=7.17% pass8=0.7 PR=0.979  -> status=ok action=none
+[monsoon    ] samcheonpo_2   mean_error=9.19% pass8=0.381 PR=1.047  -> status=ok action=none
+[equipment  ] samcheonpo_2   mean_error=16.29% pass8=0.316 PR=0.66  -> status=equipment action=alert
+[real_gwangyang] gwangyang_1    mean_error=23.46% pass8=0.2 PR=0.238  -> status=equipment action=alert
+[real_sc2_dec] samcheonpo_2   mean_error=15.81% pass8=0.25 PR=0.797  -> status=equipment action=alert
+[real_yh5   ] yeongheung5_1  mean_error=11.69% pass8=0.333 PR=0.662  -> status=equipment action=alert
+[climate_wet] samcheonpo_2   mean_error=9.19% pass8=0.381 PR=1.047  -> status=ok action=none
+[climate_wet] samcheonpo_3   mean_error=8.78% pass8=0.476 PR=0.977  -> status=ok action=none
+[climate_wet] gyeongsang_1   mean_error=8.5% pass8=0.333 PR=1.081  -> status=ok action=none
+[climate_wet] doosan_1       mean_error=6.93% pass8=0.762 PR=1.019  -> status=ok action=none
+[climate_wet] gumi_1         mean_error=8.08% pass8=0.429 PR=1.111  -> status=ok action=none
+[climate_wet] yecheon_1      mean_error=8.53% pass8=0.5 PR=1.088  -> status=ok action=none
+[climate_heat] samcheonpo_2   mean_error=12.92% pass8=0.19 PR=0.737  -> status=equipment action=alert
+[climate_heat] samcheonpo_3   mean_error=14.57% pass8=0.143 PR=0.696  -> status=model_drift action=retrain
+[climate_heat] gyeongsang_1   mean_error=15.03% pass8=0.095 PR=0.735  -> status=model_drift action=retrain
+[climate_heat] doosan_1       mean_error=10.94% pass8=0.286 PR=0.746  -> status=model_drift action=retrain
+[climate_heat] gumi_1         mean_error=8.41% pass8=0.429 PR=0.899  -> status=ok action=none
+[climate_heat] yecheon_1      mean_error=8.63% pass8=0.619 PR=0.866  -> status=ok action=none
+               -> fleet_trigger via samcheonpo_2: status=model_drift retrain=True new_error=8.39
+[fleet_shift] samcheonpo_2   mean_error=18.31% pass8=0.15 PR=1.49  -> status=model_drift action=retrain
+[fleet_shift] samcheonpo_3   mean_error=19.04% pass8=0.15 PR=1.443  -> status=model_drift action=retrain
+[fleet_shift] gyeongsang_1   mean_error=19.5% pass8=0.0 PR=1.428  -> status=model_drift action=retrain retrain=True new_error=11.03
+===== 6. 결과 =====
+--- logs/aiops.log
+2026-10-01 15:15:24,860 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=16.29% (thr 10.36%), pr_recent=0.464, pr_before=0.766, fleet_share=1.0)
+2026-10-01 15:15:24,860 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.464) - retrain blocked, operator notified
+2026-10-01 15:15:26,872 [WARNING] [WARN] drift detected (cause=equipment, plant=gwangyang_1, err=23.46% (thr 10.36%), pr_recent=0.443, pr_before=0.136, fleet_share=1.0)
+2026-10-01 15:15:26,872 [WARNING] [ALERT] equipment anomaly suspected at gwangyang_1 (PR 0.443) - retrain blocked, operator notified
+2026-10-01 15:15:28,971 [WARNING] [WARN] drift detected (cause=equipment, plant=samcheonpo_2, err=15.81% (thr 10.36%), pr_recent=0.465, pr_before=0.963, fleet_share=1.0)
+2026-10-01 15:15:28,975 [WARNING] [ALERT] equipment anomaly suspected at samcheonpo_2 (PR 0.465) - retrain blocked, operator notified
+2026-10-01 15:15:30,995 [WARNING] [WARN] drift detected (cause=equipment, plant=yeongheung5_1, err=11.69% (thr 10.36%), pr_recent=0.678, pr_before=0.653, fleet_share=1.0)
+2026-10-01 15:15:30,996 [WARNING] [ALERT] equipment anomaly suspected at yeongheung5_1 (PR 0.678) - retrain blocked, operator notified
+2026-10-01 15:15:56,635 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=samcheonpo_2, err=12.92% (thr 10.36%), pr_recent=0.712, pr_before=0.75, fleet_share=0.67)
+2026-10-01 15:15:56,643 [INFO] [INFO] retrain triggered (window=last_30_days, plants=doosan_1,gyeongsang_1,samcheonpo_2,samcheonpo_3)
+2026-10-01 15:16:14,584 [INFO] [OK] new_error=8.39% - production promoted: SolarCast_Hourly v2
+2026-10-01 15:16:21,236 [WARNING] [WARN] drift detected - triggering retrain (cause=model_drift, plant=gyeongsang_1, err=19.51% (thr 10.36%), pr_recent=1.447, pr_before=1.417, fleet_share=1.0)
+2026-10-01 15:16:21,237 [INFO] [INFO] retrain triggered (window=last_30_days, plants=gyeongsang_1,samcheonpo_2,samcheonpo_3) - excluded low-PR plants: yeongheung5_1(PR 0.678)
+2026-10-01 15:16:37,639 [INFO] [OK] new_error=11.03% - production promoted: SolarCast_Hourly v3

@@ -110,6 +110,22 @@ def batch_test(req: BatchTestRequest):
     summary["pr_mean"] = round(sum(r.pr for r in results if r.pr is not None) / max(1, sum(1 for r in results if r.pr is not None)), 3)
     if req.check:
         drift_check = check_and_trigger(req.plant_id)
+        if drift_check["status"] in ("ok", "insufficient"):
+            # 이 발전소는 멀쩡해도, 같은 시기에 기록을 쌓아 둔(check=False 로 보류한) 다른 발전소들이
+            # 동시 변화(model_drift)면 그쪽 판정을 대신 실행한다. 배치의 마지막 발전소가 임계값 이내일 때
+            # 전체 판정이 묻히지 않게 하기 위한 것.
+            from serving_app.monitoring.drift_detector import classify, window as drift_window, FLEET_DATE_TOLERANCE, _days_between
+
+            ref = results[-1].date
+            for pid in list(records):
+                if pid == req.plant_id or not records[pid]:
+                    continue
+                w = drift_window(pid)
+                if not w or abs(_days_between(w[-1]["date"], ref)) > FLEET_DATE_TOLERANCE:
+                    continue
+                if classify(pid)["status"] == "model_drift":
+                    drift_check["fleet_trigger"] = check_and_trigger(pid)
+                    break
     else:  # 판정 보류: 분류 결과만 미리보기로 돌려주고 로그·재학습은 하지 않는다
         from serving_app.monitoring.drift_detector import classify
 

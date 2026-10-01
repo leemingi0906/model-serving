@@ -52,7 +52,10 @@ def send(plant_id, label, records, persist=True, reset_state=True, check=True):
     s, d = res["summary"], res["drift_check"]
     print(f"[{label:11s}] {plant_id:<14} mean_error={s['mean_error']}% pass8={s['pass_rate_8']} PR={s['pr_mean']}  "
           f"-> status={d.get('status')} action={d.get('action')}"
-          + (f" retrain={d['retrain'].get('promoted')} new_error={d['retrain'].get('mean_error')}" if "retrain" in d else ""))
+          + (f" retrain={d['retrain'].get('promoted')} new_error={d['retrain'].get('mean_error')}" if "retrain" in d else "")
+          + (f"\n{'':14s} -> fleet_trigger via {d['fleet_trigger']['plant_id']}: status={d['fleet_trigger'].get('status')}"
+             + (f" retrain={d['fleet_trigger']['retrain'].get('promoted')} new_error={d['fleet_trigger']['retrain'].get('mean_error')}" if "retrain" in d["fleet_trigger"] else "")
+             if "fleet_trigger" in d else ""))
     return res
 
 
