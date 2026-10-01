@@ -24,3 +24,6 @@ team_solar/data_raw/*.html
 
 # 실험 중간 산출물 (모델 파일)
 team_solar/experiments/*.keras
+
+# 승격 시 생성되는 운영 메타 (런타임 산출물)
+project*/serving_app/models/production_metrics.json
