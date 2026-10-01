@@ -89,7 +89,7 @@ def batch_test(req: BatchTestRequest):
             continue
         from data.features import doy_features
 
-        cf = model.predict_cf(hist, future, doy_features(d))
+        cf = model.predict_cf(hist, future, doy_features(d), req.plant_id)
         expected = [c * cap for c in cf]
         err = day_error_rate(expected, actual, cap)
         pr = performance_ratio(actual, expected, cap)

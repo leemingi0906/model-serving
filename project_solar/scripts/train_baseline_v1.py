@@ -32,14 +32,14 @@ def main():
     print(f"scaler(정규화 상수) -> {SCALER_PATH}")
 
     plants, gen, weather = load_training_sources(with_recent=False)
-    Xh, Xf, Xd, Y, meta = build_dataset(plants, gen, weather)
+    Xh, Xf, Xd, Xp, Y, meta = build_dataset(plants, gen, weather)
     tr, te = split_by_date(meta, TEST_SPLIT)
     print(f"samples: train {len(tr)} / test {len(te)}  (plants {len(gen)})")
 
     model = build_model()
     es = keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-    model.fit([Xh[tr], Xf[tr], Xd[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0, validation_split=0.1, callbacks=[es])
-    m = evaluate(model, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants)
+    model.fit([Xh[tr], Xf[tr], Xd[tr], Xp[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0, validation_split=0.1, callbacks=[es])
+    m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
     print(f"baseline v2: mean_error={m['mean_error']}%  pass_rate_8={m['pass_rate_8']}  pass_rate_6={m['pass_rate_6']}  "
           f"rmse_cf={m['rmse_cf']}  (배포 게이트: pass_rate_8 >= {GATE_MIN_PASS_RATE})")
     model.save(MODEL_PATH)

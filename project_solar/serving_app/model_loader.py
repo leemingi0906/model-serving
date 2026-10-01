@@ -9,8 +9,9 @@ import os
 import time
 from datetime import date
 
-from data.features import SolarScaler, doy_features, normalize_weather_row, load_plants, PLANTS_PATH
+from data.features import SolarScaler, doy_features, normalize_weather_row, load_plants, plant_vector, PLANTS_PATH
 from data.solar import day_profile
+from serving_app import lstm_model  # noqa: F401  (커스텀 손실 daytime_weighted_mae 를 keras 직렬화에 등록)
 
 LOCAL_MODEL_PATH = "serving_app/models/solarcast_v2.keras"
 SCALER_PATH = "serving_app/models/scaler.pkl"
@@ -34,12 +35,14 @@ class LoadedModel:
         self.scaler = scaler
         self.version = version
 
-    def predict_cf(self, hist_cf: list[list[float]], future: list[list[float]], doy: list[float]) -> list[float]:
+    def predict_cf(self, hist_cf: list[list[float]], future: list[list[float]], doy: list[float],
+                   plant_id: str = "") -> list[float]:
         """정규화된 입력 -> 24시간 이용률"""
         import numpy as np
 
         out = self._keras_model.predict(
-            [np.array([hist_cf], "float32"), np.array([future], "float32"), np.array([doy], "float32")], verbose=0
+            [np.array([hist_cf], "float32"), np.array([future], "float32"), np.array([doy], "float32"),
+             np.array([plant_vector(plant_id)], "float32")], verbose=0
         )[0]
         # 태양고도(future 의 마지막 피처)가 0 인 시간 = 해가 없는 시간 -> 발전량 0 으로 마스킹 (sigmoid 바닥값 제거)
         return [float(min(max(v, 0.0), 1.0)) if f[-1] > 0 else 0.0 for v, f in zip(out, future)]
@@ -53,7 +56,7 @@ class LoadedModel:
         hist = [[min(max(v / cap, 0.0), 1.0)] for v in history_kwh]
         elev = day_profile(plant["lat"], plant["lon"], day)
         future = [normalize_weather_row(*row) + [elev[i]] for i, row in enumerate(forecast_rows)]
-        cf = self.predict_cf(hist, future, doy_features(day))
+        cf = self.predict_cf(hist, future, doy_features(day), plant["plant_id"])
         return [round(c * cap, 1) for c in cf]
 
 

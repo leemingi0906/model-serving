@@ -29,7 +29,7 @@ from data.features import (SolarScaler, load_plants, load_generation, load_weath
                            PLANTS_PATH, WEATHER_OBS_PATH)
 from data.metrics import day_error_rate, summarize, ERROR_THRESHOLD
 from data.storage import latest_upload, load_recent
-from serving_app.lstm_model import build_model
+from serving_app.lstm_model import build_model, daytime_weighted_mae
 
 SEED = 42
 keras.utils.set_random_seed(SEED)
@@ -39,7 +39,7 @@ MODEL_NAME = "SolarCast_Hourly"
 SCALER_PATH = "serving_app/models/scaler.pkl"
 PRODUCTION_METRICS_PATH = "serving_app/models/production_metrics.json"
 TEST_SPLIT = "2025-09-01"  # 예측일 기준: 이전 = 학습, 이후 = 테스트 (최근 1년)
-BASE_EPOCHS = 40
+BASE_EPOCHS = 120  # early stopping(val 10%, patience 10) 이 보통 50~70 에서 멈춤
 FINE_TUNE_EPOCHS = 10
 FINE_TUNE_LR = 1e-4
 
@@ -55,11 +55,11 @@ def load_training_sources(plant_ids: list[str] | None = None, with_recent: bool 
     return plants, {p: gen[p] for p in use if p in gen}, weather
 
 
-def evaluate(model, Xh, Xf, Xd, Y, meta, plants) -> dict:
+def evaluate(model, Xh, Xf, Xd, Xp, Y, meta, plants) -> dict:
     """제도 오차율: 샘플(발전소, 날)마다 일 오차율 -> 평균·통과율. RMSE(이용률)도 참고로."""
     if len(Y) == 0:
         return {"n_days": 0, "mean_error": None, "pass_rate_8": None, "pass_rate_6": None, "rmse_cf": None}
-    P = model.predict([Xh, Xf, Xd], verbose=0)
+    P = model.predict([Xh, Xf, Xd, Xp], verbose=0)
     errs = []
     for p, y, (pid, _) in zip(P, Y, meta):
         cap = plants[pid]["capacity_kw"]
@@ -132,21 +132,21 @@ def train_and_register() -> dict:
     """Day2: 처음부터(scratch) 학습. hourly_ok 발전소 전체 통합."""
     SolarScaler.load(SCALER_PATH)  # scaler.pkl 존재 확인 (Day1 에서 생성)
     plants, gen, weather = load_training_sources()
-    Xh, Xf, Xd, Y, meta = build_dataset(plants, gen, weather)
+    Xh, Xf, Xd, Xp, Y, meta = build_dataset(plants, gen, weather)
     tr, te = split_by_date(meta, TEST_SPLIT)
     print(f"samples: train {len(tr)} / test {len(te)}  (plants {len(gen)}, split {TEST_SPLIT})")
 
     champion = load_production_model()
-    champion_m = evaluate(champion, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants) if champion else None
+    champion_m = evaluate(champion, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants) if champion else None
     if champion_m:
         print(f"champion(Production) on same test: {champion_m}")
 
     with mlflow.start_run(run_name="base-train"):
         model = build_model()
         es = keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-        model.fit([Xh[tr], Xf[tr], Xd[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0,
+        model.fit([Xh[tr], Xf[tr], Xd[tr], Xp[tr]], Y[tr], epochs=BASE_EPOCHS, batch_size=64, verbose=0,
                   validation_split=0.1, callbacks=[es])
-        m = evaluate(model, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants)
+        m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
 
         mlflow.log_param("mode", "scratch")
         mlflow.log_param("epochs", len(model.history.history["loss"]))
@@ -154,7 +154,7 @@ def train_and_register() -> dict:
         mlflow.log_param("n_test", len(te))
         mlflow.log_param("plants", ",".join(sorted(gen)))
         _log_metrics("test_", m)
-        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1]])
+        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1], Xp[:1]])
         print(f"base-train: {m}")
         return _register_if_gate_passed(mlflow.active_run().info.run_id, m, champion_m)
 
@@ -165,7 +165,7 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
     짧게 fine-tuning. 게이트는 그 구간의 마지막 20% 날짜로 평가한다.
     """
     plants, gen, weather = load_training_sources(plant_ids)
-    Xh, Xf, Xd, Y, meta = build_dataset(plants, gen, weather, start=start, end=end)
+    Xh, Xf, Xd, Xp, Y, meta = build_dataset(plants, gen, weather, start=start, end=end)
     if len(Y) < 10:
         print(f"fine-tune skipped: 샘플 {len(Y)}개뿐")
         return {"run_id": None, "mean_error": None, "promoted": False, "reason": "insufficient_data"}
@@ -174,12 +174,12 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
     tr, te = split_by_date(meta, split)
 
     model = mlflow.tensorflow.load_model(f"models:/{MODEL_NAME}/Production")
-    champion_m = evaluate(model, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants)
-    model.compile(optimizer=keras.optimizers.Adam(learning_rate=FINE_TUNE_LR), loss="mse")
+    champion_m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
+    model.compile(optimizer=keras.optimizers.Adam(learning_rate=FINE_TUNE_LR), loss=daytime_weighted_mae)
 
     with mlflow.start_run(run_name="fine-tune"):
-        model.fit([Xh[tr], Xf[tr], Xd[tr]], Y[tr], epochs=FINE_TUNE_EPOCHS, batch_size=16, verbose=0)
-        m = evaluate(model, Xh[te], Xf[te], Xd[te], Y[te], [meta[i] for i in te], plants)
+        model.fit([Xh[tr], Xf[tr], Xd[tr], Xp[tr]], Y[tr], epochs=FINE_TUNE_EPOCHS, batch_size=16, verbose=0)
+        m = evaluate(model, Xh[te], Xf[te], Xd[te], Xp[te], Y[te], [meta[i] for i in te], plants)
 
         mlflow.log_param("mode", "fine-tune")
         mlflow.log_param("epochs", FINE_TUNE_EPOCHS)
@@ -188,7 +188,7 @@ def fine_tune(plant_ids: list[str], start: str, end: str) -> dict:
         mlflow.log_param("n_train", len(tr))
         _log_metrics("test_", m)
         _log_metrics("champion_", champion_m)
-        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1]])
+        mlflow.tensorflow.log_model(model, name="model", input_example=[Xh[:1], Xf[:1], Xd[:1], Xp[:1]])
         print(f"fine-tune: {m}  (current Production on same days: {champion_m})")
         return _register_finetune_if_better(mlflow.active_run().info.run_id, m, champion_m)
 

@@ -25,6 +25,10 @@ HORIZON = 24
 WEATHER_VARS = ["shortwave_radiation", "cloud_cover", "temperature_2m"]
 WEATHER_SCALE = {"shortwave_radiation": 1000.0, "cloud_cover": 100.0, "temperature_2m": 40.0}
 N_FUTURE = len(WEATHER_VARS) + 1  # + sin(태양고도)
+# 발전소 임베딩용 고정 순서 (학습에 쓴 hourly_ok 발전소). 등록되지 않은 발전소는 0 벡터 = "전역 평균 발전소"로 예측된다.
+PLANT_IDS = ["doosan_1", "gumi_1", "gwangyang_1", "gyeongsang_1", "samcheonpo_2", "samcheonpo_3",
+             "yecheon_1", "yeongheung5_1", "yeongheung_1", "yeongheung_2"]
+N_PLANTS = len(PLANT_IDS)
 MIN_GEN_FRACTION = 0.10  # 제도: 발전량이 설비용량의 10% 이상인 시간만 오차 평가
 
 PLANTS_PATH = "data/plants.csv"
@@ -94,6 +98,11 @@ def hour_keys(day: date) -> list[str]:
 
 def normalize_weather_row(ghi: float, cloud: float, temp: float) -> list[float]:
     return [ghi / WEATHER_SCALE["shortwave_radiation"], cloud / WEATHER_SCALE["cloud_cover"], temp / WEATHER_SCALE["temperature_2m"]]
+
+
+def plant_vector(plant_id: str) -> list[float]:
+    """발전소 one-hot (PLANT_IDS 순서). 미등록 발전소 -> 전부 0."""
+    return [1.0 if plant_id == pid else 0.0 for pid in PLANT_IDS]
 
 
 def doy_features(day: date) -> list[float]:
@@ -167,12 +176,12 @@ def build_day_sample(plant: dict, day: date, gen: dict[str, float], weather_loc:
 def build_dataset(plants: dict, gen_by_plant: dict, weather: dict, plant_ids=None, start: str | None = None,
                   end: str | None = None):
     """
-    반환: X_hist (n,72,1), X_fut (n,24,N_FUTURE), X_doy (n,2), y (n,24), meta [(plant_id, 'YYYY-MM-DD'), ...]
+    반환: X_hist (n,72,1), X_fut (n,24,N_FUTURE), X_doy (n,2), X_plant (n,N_PLANTS), y (n,24), meta [(plant_id, 'YYYY-MM-DD'), ...]
     start/end 는 예측일 D 의 범위(포함).
     """
     import numpy as np
 
-    Xh, Xf, Xd, Y, meta = [], [], [], [], []
+    Xh, Xf, Xd, Xp, Y, meta = [], [], [], [], [], []
     for pid, gen in gen_by_plant.items():
         if plant_ids is not None and pid not in plant_ids:
             continue
@@ -188,8 +197,9 @@ def build_dataset(plants: dict, gen_by_plant: dict, weather: dict, plant_ids=Non
             if s is None:
                 continue
             h, f, d, t = s
-            Xh.append(h); Xf.append(f); Xd.append(d); Y.append(t); meta.append((pid, ds))
-    return (np.array(Xh, "float32"), np.array(Xf, "float32"), np.array(Xd, "float32"), np.array(Y, "float32"), meta)
+            Xh.append(h); Xf.append(f); Xd.append(d); Xp.append(plant_vector(pid)); Y.append(t); meta.append((pid, ds))
+    return (np.array(Xh, "float32"), np.array(Xf, "float32"), np.array(Xd, "float32"), np.array(Xp, "float32"),
+            np.array(Y, "float32"), meta)
 
 
 def split_by_date(meta: list[tuple[str, str]], split: str):
