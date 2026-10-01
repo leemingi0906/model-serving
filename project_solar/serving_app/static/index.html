@@ -162,6 +162,12 @@
       <button class="btn secondary" onclick="sendBatch('equipment')">설비 고장 (8일째부터 ×0.5)</button>
       <button class="btn danger" onclick="sendBatch('fleet_shift')">전 발전소 변화 (3곳 ×1.25)</button>
     </div>
+    <p style="margin:12px 0 6px;color:var(--muted,#8b949e);font-size:13px">실제 데이터에서 찾은 사례 (주입 없음)</p>
+    <div class="btn-row">
+      <button class="btn secondary" onclick="sendBatch('real_gwangyang')">광양항 2025-10 (PR 0.3 지속)</button>
+      <button class="btn secondary" onclick="sendBatch('real_sc2_dec')">삼천포2 2025-12 (급락)</button>
+      <button class="btn secondary" onclick="sendBatch('real_yh5')">영흥#5 2026-08 (점진 하락)</button>
+    </div>
     <div id="drift-status" style="margin-top:14px;"></div>
     <div id="drift-result" class="result-box"></div>
   </div>
@@ -226,12 +232,15 @@ const BATCHES = {
   monsoon:     { label: "장마철 (2026-06-20~)",       runs: [{ plant: "samcheonpo_2", query: "&start=2026-06-20", persist: false }] },
   equipment:   { label: "설비 고장 (8일째부터 ×0.5)", runs: [{ plant: "samcheonpo_2", query: "&scale=0.5&scale_from_day=7", persist: false }] },
   fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
+  real_gwangyang: { label: "광양항 2025-10 실제", runs: [{ plant: "gwangyang_1", query: "&start=2025-10-05", persist: false }] },
+  real_sc2_dec:   { label: "삼천포2 2025-12 실제", runs: [{ plant: "samcheonpo_2", query: "&start=2025-12-05", persist: false }] },
+  real_yh5:       { label: "영흥#5 2026-08 실제", runs: [{ plant: "yeongheung5_1", query: "&start=2026-08-11", persist: false }] },
 };
 const STATUS_LABEL = {
   ok: "정상 (21일 오차율 ≤ 임계값)", insufficient: "판단 보류 (기록 7일 미만)",
   weather: "날씨·예보 오차 (PR 정상) → 알림만, 재학습 안 함",
-  equipment: "설비 이상 의심 (PR 급락) → 운영자 알림, 재학습 금지",
-  soiling: "오염 의심 (PR 완만 하락) → 세척 알림, 재학습 안 함",
+  equipment: "설비 이상 의심 (PR < 0.75) → 운영자 알림, 재학습 금지",
+  soiling: "오염·열화·점진 손실 의심 (PR 서서히 하락) → 점검 알림, 재학습 안 함",
   model_drift: "모델 드리프트 (여러 발전소 동시) → 재학습",
 };
 function relTime(ts) {
