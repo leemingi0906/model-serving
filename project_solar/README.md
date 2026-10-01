@@ -55,6 +55,16 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 
 ## 실행 순서 (포트 8010)
 
+한 번에 전부 돌리려면 (CPU 20~30분, 끝나면 서버가 떠 있는 상태):
+
+```bash
+cd project_solar
+pip install -r requirements.txt
+bash scripts/run_all.sh
+```
+
+단계별로 돌리려면:
+
 ```bash
 cd project_solar
 pip install -r requirements.txt
