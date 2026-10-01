@@ -42,7 +42,7 @@ v1 일 발전량 모델(기상 없음)은 일 단위라 직접 비교가 안 되
 | 설비 고장 (8일째부터 ×0.5) | 16.29% | 0.66 → 최근 7일 0.46 | equipment → `[ALERT]` 재학습 차단 |
 | 전 발전소 변화 (경남 3곳 ×1.25) | 12.2 / 13.6 / 14.2% | 1.19~1.22 | model_drift → fine-tune(3곳, 30일) new_error 10.41% ≤ 현 12.0% → **v2 승격** |
 
-| 실제 사례 (주입 없음) | 일 오차율 | PR 최근 7일 | 판정 → 대응 |
+| 실제 사례 (주입 없음, Production v1 로 평가) | 일 오차율 | PR 최근 7일 | 판정 → 대응 |
 |---|---|---|---|
 | 광양항 2025-10-05~25 (PR 0.3 지속, 10/6~11 정지) | 23.5% | 0.44 | equipment → `[ALERT]` 재학습 차단 |
 | 삼천포2 2025-12-05~25 (12/16 급락, 1/9 복구) | 15.8% | 0.47 | equipment → `[ALERT]` |
@@ -82,7 +82,7 @@ python serving_app/train_and_register.py                         # MLflow 기록
 MODEL_SOURCE=mlflow uvicorn serving_app.main:app --host 0.0.0.0 --port 8010
 
 # --- Day3 ---
-python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 전 발전소 변화 → 실제 사례 3건
+python scripts/simulate_drift.py                                 # 정상 → 장마철 → 설비 고장 → 실제 사례 3건 → 전 발전소 변화(재학습, v2 승격)
 cat logs/aiops.log ; curl localhost:8010/predict/drift-state
 ```
 

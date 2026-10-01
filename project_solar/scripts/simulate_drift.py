@@ -5,11 +5,12 @@ Day3 드리프트 시뮬레이션 (SolarCast v2) - 실제 실적을 구간별로
     normal         삼천포2 최근 21일 (2026-08)                      ok
     monsoon        삼천포2 장마철 2026-06-20 ~ 07-10 (21일)          ok 또는 weather (PR 정상) -> 재학습 안 함
     equipment      삼천포2 최근 21일, 8일째부터 발전량 x0.5           equipment -> [ALERT] 재학습 금지
-    fleet_shift    발전소 3곳 최근 21일 x1.25 (전 발전소 동시 변화)   model_drift -> 재학습 -> 게이트 -> 재배포
-    --- 실제 데이터에서 찾은 사례 (주입 없음) ---
+    --- 실제 데이터에서 찾은 사례 (주입 없음, 아직 Production v1 상태에서 평가) ---
     real_gwangyang 광양항 2025-10-05~ (PR 0.3 지속, 10/6~11 완전 정지)       equipment -> [ALERT]
     real_sc2_dec   삼천포2 2025-12-05~ (PR 0.96 -> 0.46 급락, 3주 뒤 복구)   equipment -> [ALERT]
     real_yh5       영흥#5 2026-08-11~ (2026-03 부터 PR 0.96 -> 0.64 점진 하락) equipment (장기 기록 있으면 soiling) -> [ALERT]
+    --- 마지막: 재학습이 일어나는 시나리오 (이후 Production 이 v2 로 바뀜) ---
+    fleet_shift    발전소 3곳 최근 21일 x1.25 (전 발전소 동시 변화)   model_drift -> 재학습 -> 게이트 -> 재배포
 
 사전 준비: MODEL_SOURCE=mlflow uvicorn serving_app.main:app --port 8010 서버가 떠 있고, 실적이 업로드되어 있어야 한다.
 실행: python scripts/simulate_drift.py [--only normal,monsoon,...]
@@ -68,12 +69,6 @@ def main():
         print(f"[3] 설비 고장(8일째부터 x0.5): {w['start']}~{w['end']}")
         send("samcheonpo_2", "equipment", w["records"], persist=False)
 
-    if "fleet_shift" in run:
-        print(f"[4] 전 발전소 변화(x1.25): {', '.join(FLEET)}")
-        for i, pid in enumerate(FLEET):  # 3곳 기록을 모두 쌓은 뒤 마지막에 한 번 판정 (동시성 판단)
-            w = fetch_window(pid, scale=1.25)
-            send(pid, "fleet_shift", w["records"], check=(i == len(FLEET) - 1))
-
     for key, pid, start, desc in [("real_gwangyang", "gwangyang_1", "2025-10-05", "광양항 2025-10 실제 저성능"),
                                   ("real_sc2_dec", "samcheonpo_2", "2025-12-05", "삼천포2 2025-12 실제 급락"),
                                   ("real_yh5", "yeongheung5_1", "2026-08-11", "영흥#5 2026-08 실제 점진 손실")]:
@@ -81,6 +76,12 @@ def main():
             w = fetch_window(pid, start=start)
             print(f"[실제] {desc}: {w['start']}~{w['end']}")
             send(pid, key, w["records"], persist=False)
+
+    if "fleet_shift" in run:
+        print(f"[4] 전 발전소 변화(x1.25): {', '.join(FLEET)}")
+        for i, pid in enumerate(FLEET):  # 3곳 기록을 모두 쌓은 뒤 마지막에 한 번 판정 (동시성 판단)
+            w = fetch_window(pid, scale=1.25)
+            send(pid, "fleet_shift", w["records"], check=(i == len(FLEET) - 1))
 
     print("[끝] logs/aiops.log 와 /predict/drift-state 를 확인하세요.")
 
