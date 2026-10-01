@@ -19,7 +19,7 @@ from tensorflow import keras
 from data.features import HIST_HOURS, HORIZON, N_FUTURE, N_PLANTS
 
 
-@keras.saving.register_keras_serializable(package="solarcast")
+@keras.utils.register_keras_serializable(package="solarcast")
 def daytime_weighted_mae(y_true, y_pred):
     """제도 평가 대상(이용률 >= 10%) 시간은 가중치 1, 그 외 0.15"""
     w = tf.where(y_true >= 0.10, 1.0, 0.15)
