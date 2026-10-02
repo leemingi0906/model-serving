@@ -160,3 +160,41 @@ def window(plant_id: str, start: str | None = None, n_days: int = WINDOW_DAYS, s
                 records.append({"time": k, "generation_kwh": round(gen[k] * f * fh, 3)})
     return {"plant_id": plant_id, "start": sel[3], "end": sel[-1], "n_days": n_days, "scale": scale,
             "scale_from_day": scale_from_day, "heat_loss": heat_loss, "heat_base": heat_base, "records": records}
+
+
+def day_weather(day: date, wloc: dict[str, list[float]]) -> list[dict | None]:
+    """D 01:00 ~ 24:00 기상 24개를 원 단위(W/m2, %, °C)로. 정규화 값 x WEATHER_SCALE, 결측 시간은 None."""
+    from data.features import WEATHER_SCALE, WEATHER_VARS, gen_time_to_weather_time
+
+    out = []
+    for k in hour_keys(day):
+        w = wloc.get(gen_time_to_weather_time(k))
+        if w is None or any(x != x for x in w):  # 없음 / nan
+            out.append(None)
+            continue
+        raw = {v: round(x * WEATHER_SCALE[v], 1) for v, x in zip(WEATHER_VARS, w)}
+        out.append({"ghi": raw["shortwave_radiation"], "cloud_cover": raw["cloud_cover"], "temperature": raw["temperature_2m"]})
+    return out
+
+
+@router.get("/weather")
+def weather(plant_id: str, date: str):
+    """
+    예측 카드용 (읽기 전용): D 의 하루 전 예보(d1)와 관측(obs) 기상 24시간.
+    d1 은 /predict 의 forecast 로 그대로 넣을 수 있는 형태(ghi, cloud_cover, temperature).
+    """
+    from serving_app.routers.predict import weather_d1, weather_obs  # 기상 캐시 재사용
+
+    plant = load_plants(PLANTS_PATH).get(plant_id)
+    if plant is None:
+        raise HTTPException(400, f"'{plant_id}' 는 등록된 발전소가 아닙니다.")
+    try:
+        day = __import__("datetime").date.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(400, "date 는 YYYY-MM-DD 형식이어야 합니다.")
+    d1 = day_weather(day, weather_d1().get(plant["loc"], {}))
+    obs = day_weather(day, weather_obs().get(plant["loc"], {}))
+    missing = sum(1 for w in d1 if w is None)
+    if missing:
+        raise HTTPException(400, f"{date} 의 하루 전 예보가 {missing}시간 비어 있어 예측할 수 없습니다 (예보 데이터 범위를 확인하세요).")
+    return {"plant_id": plant_id, "date": date, "hours": hour_keys(day), "d1": d1, "obs": obs}
