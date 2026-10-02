@@ -1,0 +1,38 @@
+[
+ {
+  "mode": "lazy",
+  "startup_s": 3.66,
+  "health_model_loaded_at_start": false,
+  "first_predict_s": 1.892,
+  "second_predict_s": 0.076,
+  "model_version": "production-v1",
+  "run": 1
+ },
+ {
+  "mode": "lazy",
+  "startup_s": 3.44,
+  "health_model_loaded_at_start": false,
+  "first_predict_s": 1.917,
+  "second_predict_s": 0.073,
+  "model_version": "production-v1",
+  "run": 2
+ },
+ {
+  "mode": "eager",
+  "startup_s": 5.04,
+  "health_model_loaded_at_start": true,
+  "first_predict_s": 0.342,
+  "second_predict_s": 0.078,
+  "model_version": "production-v1",
+  "run": 1
+ },
+ {
+  "mode": "eager",
+  "startup_s": 5.25,
+  "health_model_loaded_at_start": true,
+  "first_predict_s": 0.367,
+  "second_predict_s": 0.075,
+  "model_version": "production-v1",
+  "run": 2
+ }
+]

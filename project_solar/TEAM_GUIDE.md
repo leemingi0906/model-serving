@@ -85,7 +85,7 @@ docker compose -f serving_app/docker-compose.yml up --build
 | `serving_app/monitoring/` | `drift_detector.py`(원인 분류), `retrain_trigger.py`(대응), `jobs.py`(백그라운드 작업) |
 | `serving_app/train_and_register.py` | 학습·게이트·MLflow 등록 (`--register-local` 로 학습 생략) |
 | `scripts/simulate_drift.py` | 시나리오 9개 자동 실행 · `scripts/run_all.sh` 처음부터 전체 학습(20~30분) |
-| `tests/` | `python -m pytest -q` 계약 테스트 13개 |
+| `tests/` | `python -m pytest -q` 계약 테스트 14개 |
 | `logs/aiops.log` | 감지·알림·재학습·승격 기록 (발표 증빙) |
 
 ## 5. 자주 막히는 곳
