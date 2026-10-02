@@ -1,0 +1,11 @@
+# 빌드 컨텍스트에서 제외 (런타임 산출물·캐시). 데이터·동봉 모델·static 은 포함한다.
+mlruns/
+mlflow.db
+logs/
+data/uploads/
+data/recent/
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+*.pyc
+serving_app/models/production_metrics.json

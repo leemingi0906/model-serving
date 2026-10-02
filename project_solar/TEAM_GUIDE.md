@@ -42,6 +42,21 @@ python -m uvicorn serving_app.main:app --host 0.0.0.0 --port 8010
 
 브라우저: 대시보드 http://localhost:8010 · Swagger http://localhost:8010/docs
 
+## 2-1. Docker 로 띄우기 (Day2 컨테이너 재현)
+
+Docker Desktop 이 설치돼 있으면 Python 설치 없이 한 줄로 같은 화면이 뜹니다. 이미지 빌드 시점에 실적 시드 → 동봉 모델 평가·게이트·MLflow 등록 → 계약 테스트까지 끝납니다 (pip 설치 포함 5~10분, 이미지 1GB 대).
+
+```bash
+cd project_solar
+docker compose -f serving_app/docker-compose.yml up --build
+# 빌드 로그에 [GATE PASSED] 와 "14 passed" 가 보이면 정상. 뜨고 나면 http://localhost:8010 · /docs
+```
+
+- 컨테이너는 `MODEL_SOURCE=mlflow`, `LOADING_MODE=eager` 로 기동하므로 `/health` 가 처음부터 `model_loaded: true` 입니다. `docker ps` 의 STATUS 가 `healthy` 가 되면 트래픽을 받을 준비가 된 것입니다.
+- 처음부터 학습한 이미지를 원하면 `TRAIN=full docker compose -f serving_app/docker-compose.yml up --build` (CPU 20분 안팎).
+- 운영 로그는 `haearim-logs` 볼륨에 남습니다. 꺼내려면 `docker compose -f serving_app/docker-compose.yml exec serving-app cat logs/aiops.log`.
+- 멈추기: `docker compose -f serving_app/docker-compose.yml down` (볼륨까지 지우려면 `-v`).
+
 ## 3. 화면에서 해볼 것 (대시보드 버튼 순서)
 
 | 버튼 | 무엇이 보이나 | 기대 결과 |

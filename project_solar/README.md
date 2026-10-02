@@ -78,6 +78,13 @@ python scripts/simulate_drift.py     # 시나리오 9개 (재학습 2회는 백�
 python -m pytest -q                  # 계약 테스트 13개 (TensorFlow 없이 0.5초)
 ```
 
+Docker 로 (Day2 컨테이너 재현, 빌드 시 동봉 모델 등록·테스트까지):
+
+```bash
+cd project_solar
+docker compose -f serving_app/docker-compose.yml up --build   # http://localhost:8010
+```
+
 처음부터 전부 학습하려면 (CPU 20~30분):
 
 ```bash

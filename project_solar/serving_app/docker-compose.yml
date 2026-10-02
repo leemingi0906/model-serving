@@ -1,14 +1,28 @@
-# Day2: FastAPI 서빙 앱 컨테이너 (단일 서비스)
+# Day2: 해아림 FastAPI 서빙 앱 컨테이너 (단일 서비스)
 #
-# MLflow는 별도 서버 없이 이 컨테이너 안에서 로컬 sqlite로 트래킹합니다(Dockerfile 참고).
-# 이미지 빌드 시점에 샘플 데이터 시드 -> 베이스라인 학습 -> MLflow 등록까지 전부 끝나 있으므로,
-# 별도 초기화 단계나 기동 순서 없이 한 번에 띄우면 됩니다.
+# MLflow 는 별도 서버 없이 이 컨테이너 안에서 로컬 sqlite 로 트래킹한다 (Dockerfile 참고).
+# 이미지 빌드 시점에 샘플 실적 시드 -> 동봉 모델 평가·게이트·등록 -> 계약 테스트까지 끝나 있으므로
+# 별도 초기화 없이 한 번에 띄우면 된다.
 #
+#   cd project_solar
 #   docker compose -f serving_app/docker-compose.yml up --build
+#   -> http://localhost:8010  (대시보드)  ·  http://localhost:8010/docs
 #
+# 처음부터 학습한 이미지를 원하면:  TRAIN=full docker compose -f serving_app/docker-compose.yml up --build
 services:
   serving-app:
     build:
       context: ..
       dockerfile: serving_app/Dockerfile
-    ports: ["8000:8000"]
+      args:
+        TRAIN: ${TRAIN:-local}
+    image: haearim-serving:v2
+    ports: ["8010:8010"]
+    environment:
+      MODEL_SOURCE: mlflow
+      LOADING_MODE: eager
+      RETRAIN_MODE: async
+    volumes:
+      - haearim-logs:/app/logs   # aiops.log 등 운영 로그 보존 (증빙용)
+volumes:
+  haearim-logs:
