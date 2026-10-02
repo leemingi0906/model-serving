@@ -15,6 +15,9 @@ project*/logs/
 project*/data/uploads/
 project*/serving_app/models/*.keras
 project*/serving_app/models/*.pkl
+# 동봉 모델(286KB)·정규화 상수는 팀원이 quick_start 를 바로 쓰도록 예외
+!project_solar/serving_app/models/solarcast_v2.keras
+!project_solar/serving_app/models/scaler.pkl
 
 # 비밀정보 (사이트 로그인 쿠키)
 team_solar/data_raw/ck.txt
