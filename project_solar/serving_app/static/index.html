@@ -117,6 +117,52 @@
   }
   .result-box.show { display: block; }
 
+  /* ---------- 드리프트 시계열 그래프 ---------- */
+  .dchart { margin-top: 14px; display: none; }
+  .dchart.show { display: block; }
+  .dchart-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .dchart-tab { padding: 5px 10px; font-size: 0.76rem; }
+  .dchart-tab.active { border-color: var(--accent); color: var(--accent); }
+  .dchart-tab .pill { margin-left: 6px; padding: 1px 7px; font-size: 0.68rem; }
+  .dchart-meta { font-size: 0.76rem; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .dchart-body { position: relative; }
+  .dchart-panel { margin-bottom: 6px; }
+  .dchart-title { font-size: 0.78rem; font-weight: 700; margin: 6px 0 2px; }
+  .dchart-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.72rem; color: var(--muted); margin-bottom: 2px; }
+  .dchart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dchart-legend i { display: inline-block; width: 16px; height: 0; border-top-width: 2px; }
+  .dchart svg { display: block; width: 100%; overflow: visible; }
+  .dchart svg text { font-family: var(--sans); font-size: 10px; fill: var(--faint); }
+  .dchart-tip {
+    position: absolute; pointer-events: none; display: none; z-index: 5; min-width: 180px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+    font-size: 0.74rem; line-height: 1.6; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
+  .dchart-tip b { display: block; margin-bottom: 2px; }
+  .dchart-tip .row { display: flex; justify-content: space-between; gap: 14px; color: var(--muted); }
+  .dchart-tip .row span:last-child { color: var(--text); font-family: var(--mono); }
+
+  /* 시나리오 버튼: 평소엔 모두 같은 회색, 마지막에 누른 버튼만 강조. 재학습 가능 버튼은 붉은 테두리 글로우 */
+  :root { --err-glow: rgba(255, 107, 107, 0.55); --seg: #ffa94d; }
+  :root[data-theme="light"] { --err-glow: rgba(214, 69, 69, 0.45); --seg: #d9480f; }
+  .btn.scenario.retrain { border-color: var(--err-glow); box-shadow: 0 0 6px var(--err-glow); }
+  .btn.scenario.active { background: var(--accent); border-color: var(--accent); color: #0a0c10; }
+  :root[data-theme="light"] .btn.scenario.active { color: #ffffff; }
+  .btn.scenario.retrain.active { box-shadow: 0 0 0 2px var(--err-glow), 0 0 8px var(--err-glow); }
+  .scenario-hint { margin: 10px 0 0; font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .retrain-swatch { width: 18px; height: 10px; border-radius: 4px; border: 1px solid var(--err-glow); box-shadow: 0 0 5px var(--err-glow); display: inline-block; }
+  .case-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px; }
+  .case-type { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); }
+  .case-type .btn { text-align: left; font-weight: 600; font-size: 0.78rem; }
+  .case-name { font-size: 0.78rem; font-weight: 700; color: var(--text); }
+  .case-note { font-size: 0.76rem; color: var(--muted); }
+  .fc-input {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 10px; font-size: 0.83rem; font-family: var(--sans); color-scheme: dark;
+  }
+  :root[data-theme="light"] .fc-input { color-scheme: light; }
+  #fc-status .pill { margin: 0 6px 6px 0; }
+
   code { font-family: var(--mono); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
   footer { color: var(--faint); font-size: 0.76rem; text-align: center; margin: 26px 0 10px; }
 </style>
@@ -158,6 +204,25 @@
     <div id="upload-status" style="margin-top:10px;"></div>
   </div>
 
+  <!-- ================= 다음 날 24시간 예측 ================= -->
+  <div class="card">
+    <div class="section-head">
+      <h2>다음 날 24시간 발전량 예측</h2>
+      <p>
+        발전소와 예측일(D)을 고르면 업로드된 실적에서 <b>D-3~D-1 72시간 이력</b>을, 서버에 동봉된 <b>하루 전 예보</b>(일사·운량·기온)를 가져와
+        <code>POST /predict</code>로 D일 01~24시 발전량을 예측합니다(실제 서비스 조건). 모델은 "D일 01~24시" 고정 구조라 날짜 단위로만 예측합니다.
+        실적·기상이 2026-08-31까지라 예측일은 과거 날짜이고, 그날 실제 발전량·관측 일사량과 겹쳐 비교합니다.
+      </p>
+    </div>
+    <div class="upload-row">
+      <select id="fc-plant" class="fc-input"><option value="">발전소 불러오는 중…</option></select>
+      <input type="date" id="fc-date" class="fc-input" min="2023-01-04" max="2026-08-30" value="2026-08-30" />
+      <button class="btn primary" id="fc-btn" onclick="runForecast()">예측</button>
+    </div>
+    <div id="fc-status" style="margin-top:10px;"></div>
+    <div id="fc-chart" class="dchart"></div>
+  </div>
+
   <!-- ================= 드리프트 시뮬레이션 ================= -->
   <div class="card">
     <div class="section-head">
@@ -170,22 +235,34 @@
       </p>
     </div>
     <div class="btn-row">
-      <button class="btn primary" onclick="sendBatch('normal')">정상 (삼천포2 최근 21일)</button>
-      <button class="btn secondary" onclick="sendBatch('monsoon')">장마철 (2026-06-20~)</button>
-      <button class="btn secondary" onclick="sendBatch('equipment')">설비 고장 (8일째부터 ×0.5)</button>
-      <button class="btn danger" onclick="sendBatch('fleet_shift')">전 발전소 변화 (3곳 ×1.25)</button>
+      <button class="btn secondary scenario" onclick="sendBatch('normal')">정상 (삼천포2 최근 21일)</button>
+      <button class="btn secondary scenario" onclick="sendBatch('monsoon')">장마철 (2026-06-20~)</button>
+      <button class="btn secondary scenario" onclick="sendBatch('equipment')">설비 고장 (8일째부터 ×0.5)</button>
+      <button class="btn secondary scenario retrain" title="model_drift 로 판정되면 재학습이 일어납니다" onclick="sendBatch('fleet_shift')">전 발전소 변화 (3곳 ×1.25)</button>
     </div>
-    <p style="margin:12px 0 6px;color:var(--muted,#8b949e);font-size:13px">실제 데이터에서 찾은 사례 (주입 없음)</p>
+    <p style="margin:12px 0 6px;color:var(--muted,#8b949e);font-size:13px">실제 데이터에서 찾은 사례 (주입 없음 · 드리프트 6유형별, 동봉 모델 v1 기준으로 고른 구간)</p>
+    <div class="case-grid">
+      <div class="case-type"><span class="case-name">급락</span>
+        <button class="btn secondary scenario" onclick="sendBatch('real_gw_aug')">광양항 2025-08-07~27 · 08-16 하루 만에 PR 1.0→0.36</button>
+        <button class="btn secondary scenario" onclick="sendBatch('real_sc2_dec')">삼천포2 2025-12-05~25 · 12-16 급락</button></div>
+      <div class="case-type"><span class="case-name">점진</span>
+        <button class="btn secondary scenario" onclick="sendBatch('real_yh5')">영흥#5 2026-03~08 (182일) · PR 0.96→0.62 서서히</button></div>
+      <div class="case-type"><span class="case-name">복귀</span>
+        <button class="btn secondary scenario" onclick="sendBatch('real_sc2_recover')">삼천포2 2025-12-05~01-15 (42일) · 12-16 급락 → 01-08 복귀</button></div>
+      <div class="case-type"><span class="case-name">날씨</span>
+        <button class="btn secondary scenario" onclick="sendBatch('real_doosan_wx')">두산 2023-02-27~03-19 · 오차 15%인데 PR 평균 1.0</button></div>
+      <div class="case-type"><span class="case-name">동시 변화</span>
+        <span class="case-note">실제 사례 없음 → 아래 기후 B 모의 참고</span></div>
+      <div class="case-type"><span class="case-name">위로 틀림</span>
+        <button class="btn secondary scenario retrain" title="model_drift 로 판정되어 재학습이 일어납니다" onclick="sendBatch('real_gw_up')">광양항 2026-05-26~06-15 · PR 평균 1.30 (재학습 발생)</button></div>
+    </div>
     <div class="btn-row">
-      <button class="btn secondary" onclick="sendBatch('real_gwangyang')">광양항 2025-10 (PR 0.3 지속)</button>
-      <button class="btn secondary" onclick="sendBatch('real_sc2_dec')">삼천포2 2025-12 (급락)</button>
-      <button class="btn secondary" onclick="sendBatch('real_yh5')">영흥#5 2026-08 (점진 하락)</button>
+      <button class="btn secondary scenario" onclick="sendBatch('climate_wet')">기후 A: 우기 패턴만 (6곳, 2026-06-20~)</button>
+      <button class="btn secondary scenario retrain" title="model_drift 로 판정되면 재학습이 일어납니다" onclick="sendBatch('climate_heat')">기후 B: 폭염화 관계 변화 (6곳, 28°C↑ 1°C당 −5%)</button>
     </div>
-    <div class="btn-row">
-      <button class="btn secondary" onclick="sendBatch('climate_wet')">기후 A: 우기 패턴만 (6곳, 2026-06-20~)</button>
-      <button class="btn danger" onclick="sendBatch('climate_heat')">기후 B: 폭염화 관계 변화 (6곳, 28°C↑ 1°C당 −5%)</button>
-    </div>
+    <p class="scenario-hint"><span class="retrain-swatch"></span>테두리가 붉게 빛나는 버튼은 재학습(모델 교체)이 일어날 수 있는 시나리오입니다. 마지막에 누르세요.</p>
     <div id="drift-status" style="margin-top:14px;"></div>
+    <div id="drift-chart" class="dchart"></div>
     <div id="drift-result" class="result-box"></div>
   </div>
 
@@ -249,9 +326,13 @@ const BATCHES = {
   monsoon:     { label: "장마철 (2026-06-20~)",       runs: [{ plant: "samcheonpo_2", query: "&start=2026-06-20", persist: false }] },
   equipment:   { label: "설비 고장 (8일째부터 ×0.5)", runs: [{ plant: "samcheonpo_2", query: "&scale=0.5&scale_from_day=7", persist: false }] },
   fleet_shift: { label: "전 발전소 변화 (3곳 ×1.25)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1"].map(p => ({ plant: p, query: "&scale=1.25", persist: true })) },
-  real_gwangyang: { label: "광양항 2025-10 실제", runs: [{ plant: "gwangyang_1", query: "&start=2025-10-05", persist: false }] },
-  real_sc2_dec:   { label: "삼천포2 2025-12 실제", runs: [{ plant: "samcheonpo_2", query: "&start=2025-12-05", persist: false }] },
-  real_yh5:       { label: "영흥#5 2026-08 실제", runs: [{ plant: "yeongheung5_1", query: "&start=2026-08-11", persist: false }] },
+  // 실제 사례 (주입 없음): 드리프트 6유형별로 빈 날 없는 구간. n_days 가 없으면 WINDOW_DAYS(21)
+  real_gw_aug:      { label: "급락 · 광양항 2025-08 실제", runs: [{ plant: "gwangyang_1", query: "&start=2025-08-07", persist: false }] },
+  real_sc2_dec:     { label: "급락 · 삼천포2 2025-12 실제", runs: [{ plant: "samcheonpo_2", query: "&start=2025-12-05", persist: false }] },
+  real_yh5:         { label: "점진 · 영흥#5 2026-03~08 실제 (182일)", runs: [{ plant: "yeongheung5_1", query: "&start=2026-03-01", n_days: 182, persist: false }] },
+  real_sc2_recover: { label: "복귀 · 삼천포2 2025-12~2026-01 실제 (42일)", runs: [{ plant: "samcheonpo_2", query: "&start=2025-12-05", n_days: 42, persist: false }] },
+  real_doosan_wx:   { label: "날씨 · 두산 2023-03 실제", runs: [{ plant: "doosan_1", query: "&start=2023-02-27", persist: false }] },
+  real_gw_up:       { label: "위로 틀림 · 광양항 2026-05~06 실제", runs: [{ plant: "gwangyang_1", query: "&start=2026-05-26", persist: false }] },
   climate_wet:    { label: "기후 A: 우기 패턴만 (6곳)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1", "doosan_1", "gumi_1", "yecheon_1"].map(p => ({ plant: p, query: "&start=2026-06-20", persist: false })) },
   climate_heat:   { label: "기후 B: 폭염화 관계 변화 (6곳)", runs: ["samcheonpo_2", "samcheonpo_3", "gyeongsang_1", "doosan_1", "gumi_1", "yecheon_1"].map(p => ({ plant: p, query: "&start=2026-07-11&heat_loss=0.05&heat_base=28", persist: true })) },
 };
@@ -307,6 +388,7 @@ async function uploadFile() {
       return;
     }
     statusEl.innerHTML = `<span class="pill ok"><span class="dot"></span>업로드 완료: ${data.filename} (${data.rows}행)</span>`;
+    loadForecastPlants();
   } catch (e) {
     statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>요청 실패: ${e.message}</span>`;
   }
@@ -377,13 +459,16 @@ async function sendBatch(kind) {
   const statusEl = document.getElementById("drift-status");
   const resultBox = document.getElementById("drift-result");
   const batch = BATCHES[kind];
+  document.querySelectorAll(".btn.scenario").forEach(b => b.classList.toggle("active", b.getAttribute("onclick") === `sendBatch('${kind}')`));
   statusEl.innerHTML = `<span class="pill warn"><span class="dot"></span>${batch.label} 전송 중… (재학습이 걸리면 1~2분 걸릴 수 있습니다)</span>`;
 
   try {
     let data = null, win = null;
     const all = [];
+    const chartRuns = []; // 그래프 전용 보관 (결과 박스 출력과 무관)
+    hideDriftChart();
     for (const [ri, run] of batch.runs.entries()) {
-      win = await getJSON(`/data/window?plant_id=${run.plant}&n_days=${WINDOW_DAYS}${run.query}`);
+      win = await getJSON(`/data/window?plant_id=${run.plant}&n_days=${run.n_days || WINDOW_DAYS}${run.query}`);
       if (!win.ok) {
         statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${(win.data && win.data.detail) || "실적 데이터를 먼저 업로드하세요"}</span>`;
         return;
@@ -397,6 +482,8 @@ async function sendBatch(kind) {
         return;
       }
       all.push({ plant: run.plant, summary: data.summary, drift_check: data.drift_check });
+      const { records, ...winMeta } = win.data;
+      chartRuns.push({ plant: run.plant, days: data.days || [], drift_check: data.drift_check || {}, win: winMeta });
     }
 
     // 배치 마지막 발전소는 정상이어도 같은 시기의 다른 발전소가 동시 변화면 fleet_trigger 에 그 판정이 들어온다
@@ -426,6 +513,7 @@ async function sendBatch(kind) {
     renderPipeline();
     loadLogFiles();
     renderStatus();
+    showDriftChart(batch.label, chartRuns, check);
     showResult(resultBox, batch.runs.length > 1 ? all : data, false);
 
     // 재학습이 백그라운드로 걸렸으면 끝날 때까지 /jobs/current 를 보고 파이프라인·로그를 갱신한다
@@ -447,6 +535,434 @@ async function sendBatch(kind) {
     showResult(resultBox, "요청 실패: " + e.message, true);
   }
 }
+
+/* ===================== 다음 날 24시간 예측 ===================== */
+// 서버(data/features.py PLANT_IDS, MIN_GEN_FRACTION)와 동일한 값 (상수만 복제)
+const MODEL_PLANT_IDS = ["doosan_1", "gumi_1", "gwangyang_1", "gyeongsang_1", "samcheonpo_2", "samcheonpo_3",
+                         "yecheon_1", "yeongheung5_1", "yeongheung_1", "yeongheung_2"];
+const MIN_GEN_FRACTION = 0.10;
+let FC = null; // 마지막 예측 결과 (리사이즈 시 다시 그림)
+
+async function loadForecastPlants() {
+  const sel = document.getElementById("fc-plant");
+  const st = await getJSON("/data/status").catch(() => ({ ok: false }));
+  if (!st.ok || !st.data || !st.data.exists) {
+    sel.innerHTML = `<option value="">실적 데이터를 먼저 업로드하세요</option>`;
+    return;
+  }
+  const prev = sel.value || "samcheonpo_2";
+  const ids = MODEL_PLANT_IDS.filter(pid => st.data.per_plant[pid]);
+  sel.innerHTML = ids.map(pid => {
+    const p = st.data.per_plant[pid];
+    return `<option value="${pid}">${p.name} (${Math.round(p.capacity_kw).toLocaleString()} kW)</option>`;
+  }).join("");
+  if (ids.includes(prev)) sel.value = prev;
+}
+// data/metrics.py day_error_rate 와 같은 정의: 실제 >= 용량 10% 인 시간만, |예측-실제|/용량 평균
+function dayErrorRate(pred, actual, cap) {
+  const errs = [];
+  pred.forEach((p, i) => { const a = actual[i]; if (a != null && a >= MIN_GEN_FRACTION * cap) errs.push(Math.abs(p - a) / cap * 100); });
+  return errs.length ? errs.reduce((s, v) => s + v, 0) / errs.length : null;
+}
+async function runForecast() {
+  const statusEl = document.getElementById("fc-status");
+  const chartEl = document.getElementById("fc-chart");
+  const btn = document.getElementById("fc-btn");
+  const plantId = document.getElementById("fc-plant").value;
+  const day = document.getElementById("fc-date").value;
+  const fail = (msg) => { statusEl.innerHTML = `<span class="pill err"><span class="dot"></span>${msg}</span>`; chartEl.classList.remove("show"); };
+  if (!plantId) return fail("실적 데이터를 먼저 업로드하세요");
+  if (!day) return fail("예측일을 고르세요");
+  statusEl.innerHTML = `<span class="pill neutral"><span class="dot"></span>예측 중… (첫 요청은 모델 로드로 수 초 걸릴 수 있습니다)</span>`;
+  btn.disabled = true;
+  try {
+    // 1) 이력 72h + D 실제 24h (업로드 원본)
+    const win = await getJSON(`/data/window?plant_id=${plantId}&start=${day}&n_days=1`);
+    if (!win.ok) return fail(`실적 조회 실패: ${(win.data && win.data.detail) || win.status}`);
+    const recs = win.data.records;
+    const dayKeys = Array.from({ length: 24 }, (_, i) => `${day} ${String(i + 1).padStart(2, "0")}:00`);
+    const byTime = Object.fromEntries(recs.map(r => [r.time, r.generation_kwh]));
+    const history = recs.filter(r => r.time < `${day} 00:00`).map(r => r.generation_kwh);
+    if (history.length !== 72) return fail(`D-3~D-1 이력이 ${history.length}/72시간뿐이라 예측할 수 없습니다`);
+    const actual = dayKeys.map(k => byTime[k] ?? null);
+    const yesterday = history.slice(48);
+    // 2) D 의 하루 전 예보 + 관측 기상
+    const wx = await getJSON(`/data/weather?plant_id=${plantId}&date=${day}`);
+    if (!wx.ok) return fail(`예보 조회 실패: ${(wx.data && wx.data.detail) || wx.status}`);
+    // 3) 서빙 경로 그대로 POST /predict (forecast = 하루 전 예보)
+    const res = await fetch("/predict", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plant_id: plantId, date: day, history_kwh: history, forecast: wx.data.d1 }) });
+    const pred = await safeJson(res);
+    if (!res.ok) return fail(`예측 실패 (${res.status}): ${typeof pred.detail === "string" ? pred.detail : JSON.stringify(pred.detail || pred.__raw)}`);
+
+    const st = await getJSON("/data/status");
+    const cap = st.ok && st.data.per_plant && st.data.per_plant[plantId] ? st.data.per_plant[plantId].capacity_kw : null;
+    const actTotal = actual.every(v => v != null) ? actual.reduce((s, v) => s + v, 0) : null;
+    const err = cap ? dayErrorRate(pred.hourly_kwh, actual, cap) : null;
+    const errLevel = err == null ? "neutral" : err <= 8 ? "ok" : "warn";
+    statusEl.innerHTML =
+      `<span class="pill neutral"><span class="dot"></span>모델 ${pred.model_version}</span>`
+      + `<span class="pill neutral">예측 합계 ${Math.round(pred.day_total_kwh).toLocaleString()} kWh</span>`
+      + `<span class="pill neutral">실제 합계 ${actTotal == null ? "-" : Math.round(actTotal).toLocaleString() + " kWh"}</span>`
+      + `<span class="pill ${errLevel}"><span class="dot"></span>제도 일 오차율 ${err == null ? "평가 불가 (발전 시간 없음)" : err.toFixed(2) + "%" + (err <= 8 ? " · 8% 이내" : " · 8% 초과")}</span>`;
+    FC = { plantId, day, cap, pred: pred.hourly_kwh, actual, yesterday, d1: wx.data.d1, obs: wx.data.obs };
+    renderForecastChart();
+  } catch (e) {
+    fail("요청 실패: " + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+function renderForecastChart() {
+  if (!FC) return;
+  const el = document.getElementById("fc-chart");
+  const leg = (items) => `<div class="dchart-legend">${items.map(([c, t, dash]) =>
+    `<span><i style="border-top:2px ${dash ? "dashed" : "solid"} ${c}"></i>${t}</span>`).join("")}</div>`;
+  el.innerHTML = `<div class="dchart-body">
+      <div class="dchart-panel"><div class="dchart-title">시간별 발전량 (kWh) · ${FC.day}</div>
+        ${leg([["var(--accent)", "예측 (하루 전 예보 입력)"], ["var(--ok)", "실제", 1], ["var(--faint)", "어제 같은 시간 실적 (persistence)"]])}
+        <svg data-k="kwh"></svg></div>
+      <div class="dchart-panel"><div class="dchart-title">일사량 (W/m²)</div>
+        ${leg([["var(--warn)", "하루 전 예보 일사량"], ["var(--muted)", "실제 관측 일사량", 1]])}
+        <svg data-k="ghi"></svg></div>
+      <div class="dchart-tip"></div>
+    </div>`;
+  el.classList.add("show");
+
+  const body = el.querySelector(".dchart-body");
+  const W = Math.max(320, body.clientWidth), H = 170, L = 50, R = 10, T = 8, B = 20, n = 24;
+  const xOf = i => L + i * (W - L - R) / (n - 1);
+  const svgs = Object.fromEntries([...el.querySelectorAll("svg")].map(s => [s.dataset.k, s]));
+  const ghiOf = (arr) => arr.map(w => w ? w.ghi : null);
+
+  function panel(svg, hi, fmt, lines) {
+    const yOf = v => T + (H - T - B) * (1 - v / hi);
+    let s = "";
+    for (const v of niceTicks(0, hi, 4)) s += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" style="stroke:var(--border)" stroke-width="1"/>`
+      + `<text x="${L - 6}" y="${yOf(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+    for (const ln of lines) {
+      const segs = []; let cur = [];
+      ln.data.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(`${xOf(i)},${yOf(v)}`); });
+      if (cur.length) segs.push(cur);
+      for (const sg of segs) s += `<polyline points="${sg.join(" ")}" fill="none" style="stroke:${ln.color}" stroke-width="${ln.width || 2}" stroke-linejoin="round" stroke-linecap="round"${ln.dash ? ' stroke-dasharray="5 4"' : ""}${ln.opacity ? ` opacity="${ln.opacity}"` : ""}/>`;
+      if (ln.dots) ln.data.forEach((v, i) => { if (v != null) s += `<circle cx="${xOf(i)}" cy="${yOf(v)}" r="2.5" style="fill:${ln.color};stroke:var(--panel)" stroke-width="1"/>`; });
+    }
+    for (let i = 0; i < n; i += 3) s += `<text x="${xOf(i)}" y="${H - 5}" text-anchor="middle">${i + 1}시</text>`;
+    s += `<text x="${xOf(n - 1)}" y="${H - 5}" text-anchor="middle">24시</text>`;
+    s += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" style="stroke:var(--muted);display:none" stroke-width="1"/>`;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("height", H);
+    svg.innerHTML = s;
+  }
+  const kwhMax = Math.max(1, ...FC.pred, ...FC.actual.filter(v => v != null), ...FC.yesterday) * 1.1;
+  const ghiMax = Math.max(100, ...ghiOf(FC.d1).filter(v => v != null), ...ghiOf(FC.obs).filter(v => v != null)) * 1.1;
+  panel(svgs.kwh, kwhMax, fmtKwh, [
+    { data: FC.yesterday, color: "var(--faint)", width: 1.5, opacity: 0.7 },
+    { data: FC.actual, color: "var(--ok)", dash: true, dots: true },
+    { data: FC.pred, color: "var(--accent)" },
+  ]);
+  panel(svgs.ghi, ghiMax, v => v.toFixed(0), [
+    { data: ghiOf(FC.obs), color: "var(--muted)", dash: true, dots: true },
+    { data: ghiOf(FC.d1), color: "var(--warn)" },
+  ]);
+
+  const tip = el.querySelector(".dchart-tip");
+  const f = (v, suf = "", d = 1) => v == null ? "-" : Number(v).toFixed(d) + suf;
+  body.onmousemove = (ev) => {
+    const r = svgs.kwh.getBoundingClientRect();
+    const sx = (ev.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(n - 1, Math.round((sx - L) / ((W - L - R) / (n - 1)))));
+    for (const s of Object.values(svgs)) { const xh = s.querySelector(".xh"); xh.setAttribute("x1", xOf(i)); xh.setAttribute("x2", xOf(i)); xh.style.display = ""; }
+    const d1 = FC.d1[i] || {}, ob = FC.obs[i] || {};
+    const a = FC.actual[i], p = FC.pred[i];
+    const herr = FC.cap && a != null ? Math.abs(p - a) / FC.cap * 100 : null;
+    tip.innerHTML = `<b>${FC.day} ${String(i + 1).padStart(2, "0")}:00 (${i}~${i + 1}시 구간)</b>`
+      + `<div class="row"><span>예측</span><span>${f(p, " kWh")}</span></div>`
+      + `<div class="row"><span>실제</span><span>${f(a, " kWh")}</span></div>`
+      + `<div class="row"><span>시간 오차율</span><span>${herr == null ? "-" : herr.toFixed(1) + "%" + (a < MIN_GEN_FRACTION * FC.cap ? " (평가 제외)" : "")}</span></div>`
+      + `<div class="row"><span>어제 같은 시간</span><span>${f(FC.yesterday[i], " kWh")}</span></div>`
+      + `<div class="row"><span>예보 일사량</span><span>${f(d1.ghi, " W/m²", 0)}</span></div>`
+      + `<div class="row"><span>관측 일사량</span><span>${f(ob.ghi, " W/m²", 0)}</span></div>`
+      + `<div class="row"><span>운량 예보/관측</span><span>${f(d1.cloud_cover, "", 0)} / ${f(ob.cloud_cover, "%", 0)}</span></div>`
+      + `<div class="row"><span>기온 예보/관측</span><span>${f(d1.temperature, "", 1)} / ${f(ob.temperature, "°C", 1)}</span></div>`;
+    tip.style.display = "block";
+    const bx = body.getBoundingClientRect();
+    const left = ev.clientX - bx.left + 14;
+    tip.style.left = (left + tip.offsetWidth > bx.width ? ev.clientX - bx.left - tip.offsetWidth - 14 : left) + "px";
+    tip.style.top = Math.max(0, ev.clientY - bx.top - tip.offsetHeight / 2) + "px";
+  };
+  body.onmouseleave = () => {
+    tip.style.display = "none";
+    for (const s of Object.values(svgs)) s.querySelector(".xh").style.display = "none";
+  };
+}
+
+/* ===================== 드리프트 시계열 그래프 ===================== */
+// batch-test 응답의 days[] 를 그대로 그린다 (새 API 호출 없음). 인라인 SVG, 색은 CSS 변수라 테마 전환에 따라감.
+const DCHART = { label: "", runs: [], idx: 0 };
+const STATUS_SHORT = { ok: "ok", insufficient: "보류", weather: "날씨", equipment: "설비", soiling: "오염", model_drift: "모델 드리프트" };
+const STATUS_LEVEL = { ok: "ok", insufficient: "neutral", weather: "warn", equipment: "err", soiling: "warn", model_drift: "err" };
+
+function hideDriftChart() {
+  const el = document.getElementById("drift-chart");
+  el.classList.remove("show");
+  el.innerHTML = "";
+}
+function showDriftChart(label, runs, check) {
+  runs = runs.filter(r => r.days.length);
+  if (!runs.length) return;
+  DCHART.label = label;
+  DCHART.runs = runs;
+  const target = runs.findIndex(r => r.plant === check.plant_id);
+  DCHART.idx = target >= 0 ? target : runs.length - 1;
+  renderDriftChart();
+}
+function addDays(ds, n) {
+  const d = new Date(ds + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function injectionInfo(w) {
+  if (!w) return null;
+  if (w.scale != null && w.scale !== 1) {
+    const from = w.scale_from_day || 0;
+    return { date: from > 0 ? addDays(w.start, from) : null, text: `발전량 ×${w.scale}` + (from > 0 ? ` (${from + 1}일째부터)` : " (전 구간)") };
+  }
+  if (w.heat_loss > 0) return { date: null, text: `폭염 손실: 관측기온 ${w.heat_base}°C 초과 1°C당 −${Math.round(w.heat_loss * 100)}% (전 구간)` };
+  return null;
+}
+function niceTicks(lo, hi, n) {
+  const step0 = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step0) || step0;
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6));
+  return out;
+}
+function fmtKwh(v) { return v >= 10000 ? (v / 1000).toFixed(0) + "k" : v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(0); }
+
+// 평가일이 이보다 길면 "장기 모드": 일별 값은 작은 회색 점(배경), 후행 이동평균을 추세선으로, 판정 근거(3구간 평균·판정 창)를 표시
+const LONG_MODE_DAYS = 45;
+// 후행 이동평균: i 일까지 최근 k 일 (null 제외). k 일이 다 차기 전은 null
+function trailingMean(arr, k) {
+  return arr.map((_, i) => {
+    if (i < k - 1) return null;
+    const xs = arr.slice(i - k + 1, i + 1).filter(v => v != null);
+    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  });
+}
+
+function renderDriftChart() {
+  const el = document.getElementById("drift-chart");
+  const run = DCHART.runs[DCHART.idx];
+  const dc = run.drift_check || {};
+  const days = run.days;
+  const thr = dc.threshold;
+  const inj = injectionInfo(run.win);
+
+  const tabs = DCHART.runs.length > 1 ? `<div class="dchart-tabs">${DCHART.runs.map((r, i) => {
+    const st = (r.drift_check || {}).status;
+    return `<button class="btn secondary dchart-tab ${i === DCHART.idx ? "active" : ""}" onclick="DCHART.idx=${i};renderDriftChart()">${r.plant}`
+      + (st ? `<span class="pill ${STATUS_LEVEL[st] || "neutral"}">${STATUS_SHORT[st] || st}</span>` : "") + `</button>`;
+  }).join("")}</div>` : "";
+  const meta = `<b>${run.plant}</b> · ${days[0].date} ~ ${days[days.length - 1].date} (${days.length}일 평가)`
+    + (dc.window_error != null ? ` · 창 오차 ${dc.window_error}% / 임계값 ${thr}%` : "")
+    + (dc.pr_recent != null ? ` · PR 이전 ${dc.pr_before ?? "-"} → 최근 7일 ${dc.pr_recent}` : "")
+    + (inj ? `<br/>주입: ${inj.text}` : "");
+  const n = days.length;
+  const long = n > LONG_MODE_DAYS;
+  const lt = dc.long_trend;
+  const metaLong = lt ? `<br/>장기 추세 (판정기 3구간 PR 평균): 처음 30일 ${lt.pr_first30} → 중간 ${lt.pr_mid} → 최근 7일 ${lt.pr_recent}`
+    + (lt.gradual ? " · 단조 하락" : " · 단조 하락 아님") : "";
+  // kind: 1 = 점선, "dot" = 점, "zone" = 면, "bar" = 굵은 막대, 그 외 실선
+  const leg = (items) => `<div class="dchart-legend">${items.map(([c, t, kind]) => {
+    const mark = kind === "dot" ? `<i style="width:6px;height:6px;border:none;border-radius:50%;background:${c}"></i>`
+      : kind === "zone" ? `<i style="width:14px;height:9px;border:none;background:${c};opacity:0.45"></i>`
+      : `<i style="border-top:${kind === "bar" ? 4 : 2}px ${kind === 1 ? "dashed" : "solid"} ${c}"></i>`;
+    return `<span>${mark}${t}</span>`;
+  }).join("")}</div>`;
+  const legErr = long
+    ? [["var(--faint)", "일별 오차율", "dot"], ["var(--accent)", "21일 이동평균 = 그날 판정했다면의 창 오차", "bar"], ["var(--err)", `드리프트 임계 ${thr ?? "-"}%`, 1], ["var(--faint)", "제도 기준 8%", 1]]
+    : [["var(--accent)", "관측 기상 입력"], ["var(--warn)", "하루 전 예보 입력 (d1)", 1], ["var(--err)", `드리프트 임계 ${thr ?? "-"}%`, 1], ["var(--faint)", "제도 기준 8%", 1]];
+  const legPr = long
+    ? [["var(--faint)", "일별 PR", "dot"], ["var(--accent)", "30일 이동평균 (추세)", "bar"]].concat(lt ? [["var(--seg)", "판정기 3구간 평균 (주황 점들의 평균)", "bar"]] : [])
+        .concat([["var(--faint)", "1.0 기대만큼", 1], ["var(--err-soft)", "0.75 미만 설비 이상 영역", "zone"]])
+    : [["var(--accent)", "PR"], ["var(--faint)", "1.0 기대만큼", 1], ["var(--err)", "0.75 설비 이상 기준", 1]];
+  const legKwh = long
+    ? [["var(--ok)", "실제 (7일 평균)", "bar"], ["var(--accent)", "모델 기대 (7일 평균)", 1]]
+    : [["var(--ok)", "실제 actual"], ["var(--accent)", "모델 기대 expected", 1]];
+
+  el.innerHTML = `${tabs}<div class="dchart-meta">${meta}${metaLong}</div>
+    <div class="dchart-body">
+      <div class="dchart-panel"><div class="dchart-title">일 오차율 (%)</div>
+        ${leg(legErr)}
+        <svg data-k="err"></svg></div>
+      <div class="dchart-panel"><div class="dchart-title">성능비 PR (실제 ÷ 기대)</div>
+        ${leg(legPr)}
+        <svg data-k="pr"></svg></div>
+      <div class="dchart-panel"><div class="dchart-title">일 발전량 (kWh)</div>
+        ${leg(legKwh)}
+        <svg data-k="kwh"></svg></div>
+      <div class="dchart-tip"></div>
+    </div>`;
+  el.classList.add("show");
+
+  const body = el.querySelector(".dchart-body");
+  const W = Math.max(320, body.clientWidth), H = long ? 170 : 150, L = 44, R = 10, T = 8, B = 20;
+  const xOf = i => L + (n === 1 ? (W - L - R) / 2 : i * (W - L - R) / (n - 1));
+  const injIdx = inj && inj.date ? days.findIndex(d => d.date >= inj.date) : -1;
+
+  function panel(svg, cfg) {
+    const { lo, hi } = cfg;
+    const yOf = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    let s = "";
+    if (cfg.band) s += `<rect x="${xOf(cfg.band[0]) - 4}" y="${T}" width="${xOf(cfg.band[1]) - xOf(cfg.band[0]) + 8}" height="${H - T - B}" style="fill:var(--accent-soft)"/>`
+      + `<text x="${xOf(cfg.band[1])}" y="${T + 10}" text-anchor="end">${cfg.bandLabel || "최근 7일"}</text>`;
+    if (cfg.zoneBelow != null && cfg.zoneBelow > lo) s += `<rect x="${L}" y="${yOf(Math.min(cfg.zoneBelow, hi))}" width="${W - L - R}" height="${yOf(lo) - yOf(Math.min(cfg.zoneBelow, hi))}" style="fill:var(--err-soft)" opacity="0.45"/>`;
+    for (const v of niceTicks(lo, hi, 4)) {
+      s += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" style="stroke:var(--border)" stroke-width="1"/>`
+        + `<text x="${L - 6}" y="${yOf(v) + 3}" text-anchor="end">${cfg.fmt(v)}</text>`;
+    }
+    for (const [v, c] of cfg.refs || []) {
+      if (v == null || v < lo || v > hi) continue;
+      s += `<line x1="${L}" x2="${W - R}" y1="${yOf(v)}" y2="${yOf(v)}" style="stroke:${c}" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    }
+    if (injIdx > 0) s += `<line x1="${xOf(injIdx)}" x2="${xOf(injIdx)}" y1="${T}" y2="${H - B}" style="stroke:var(--warn)" stroke-width="1.5"/>`
+      + (cfg.injLabel ? `<text x="${xOf(injIdx) + 4}" y="${T + 10}" style="fill:var(--warn)">주입 시작</text>` : "");
+    if (cfg.area) {
+      const [a, b] = cfg.area;  // 키 이름 또는 값 배열
+      const va = Array.isArray(a) ? a : days.map(d => d[a]), vb = Array.isArray(b) ? b : days.map(d => d[b]);
+      const ok = days.map((_, i) => va[i] != null && vb[i] != null);
+      const i0 = ok.indexOf(true), i1 = ok.lastIndexOf(true);
+      if (i0 >= 0) {
+        const idx = [...Array(i1 - i0 + 1).keys()].map(k => k + i0).filter(i => ok[i]);
+        const pts = idx.map(i => `${xOf(i)},${yOf(va[i])}`).concat(idx.slice().reverse().map(i => `${xOf(i)},${yOf(vb[i])}`));
+        s += `<polygon points="${pts.join(" ")}" style="fill:var(--err-soft)"/>`;
+      }
+    }
+    for (const line of cfg.lines) {
+      const vs = line.values || days.map(d => d[line.key]);
+      if (!line.noLine) {
+        const segs = []; let cur = [];
+        vs.forEach((v, i) => { if (v == null) { if (cur.length) segs.push(cur); cur = []; } else cur.push(`${xOf(i)},${yOf(v)}`); });
+        if (cur.length) segs.push(cur);
+        for (const sg of segs) s += `<polyline points="${sg.join(" ")}" fill="none" style="stroke:${line.color}" stroke-width="${line.width || 2}" stroke-linejoin="round" stroke-linecap="round"${line.dash ? ' stroke-dasharray="5 4"' : ""}/>`;
+      }
+      if (line.dots) vs.forEach((v, i) => {
+        if (v == null) return;
+        if (line.dotR) {
+          const hc = line.dotColorAt ? line.dotColorAt(i) : null;  // 3구간 평균에 들어간 날 = 주황
+          s += `<circle cx="${xOf(i)}" cy="${yOf(v)}" r="${hc ? line.dotR + 0.8 : line.dotR}" style="fill:${hc || line.color}" opacity="${hc ? 0.95 : 0.8}"/>`;
+          return;
+        }
+        const c = line.dotColor ? line.dotColor(v) : null;
+        s += `<circle cx="${xOf(i)}" cy="${yOf(v)}" r="${c ? 4 : 2.5}" style="fill:${c || line.color};stroke:var(--panel)" stroke-width="1.5"/>`;
+      });
+    }
+    for (const sg of cfg.segments || []) {
+      if (sg.v < lo || sg.v > hi) continue;
+      s += `<line x1="${xOf(sg.a)}" x2="${xOf(sg.b)}" y1="${yOf(sg.v)}" y2="${yOf(sg.v)}" style="stroke:var(--panel)" stroke-width="8" stroke-linecap="round"/>`
+        + `<line x1="${xOf(sg.a)}" x2="${xOf(sg.b)}" y1="${yOf(sg.v)}" y2="${yOf(sg.v)}" style="stroke:var(--seg)" stroke-width="4.5" stroke-linecap="round"/>`
+        + `<text x="${Math.min(Math.max((xOf(sg.a) + xOf(sg.b)) / 2, L + 45), W - R - 45)}" y="${yOf(sg.v) - 9}" text-anchor="middle" style="fill:var(--seg);font-weight:700;font-size:11px;paint-order:stroke;stroke:var(--panel);stroke-width:3px">${sg.label}</text>`;
+    }
+    const every = Math.ceil(n / 7);
+    days.forEach((d, i) => { if (i % every === 0 || i === n - 1) s += `<text x="${xOf(i)}" y="${H - 5}" text-anchor="middle">${d.date.slice(5)}</text>`; });
+    s += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" style="stroke:var(--muted);display:none" stroke-width="1"/>`;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("height", H);
+    svg.innerHTML = s;
+  }
+  const vals = (k) => days.map(d => d[k]).filter(v => v != null);
+  const errMax = Math.max(thr || 0, 8, ...vals("day_error"), ...vals("d1_error"));
+  const prs = vals("pr");
+  const kwh = [...vals("actual_kwh"), ...vals("expected_kwh")];
+  const svgs = Object.fromEntries([...el.querySelectorAll("svg")].map(s => [s.dataset.k, s]));
+
+  // 장기 모드 보조 계열: 오차 21일(= 판정 창), PR 30일, 발전량 7일 후행 이동평균
+  const rollErr = long ? trailingMean(days.map(d => d.day_error), 21) : null;
+  const rollPr = long ? trailingMean(days.map(d => d.pr), 30) : null;
+  const rollAct = long ? trailingMean(days.map(d => d.actual_kwh), 7) : null;
+  const rollExp = long ? trailingMean(days.map(d => d.expected_kwh), 7) : null;
+  // 판정기 long_trend 와 같은 구간: PR 이 있는 날 기준 처음 30일 / 가운데 14일 / 최근 7일 (값은 서버가 계산한 것을 그대로 씀)
+  const prDays = days.map((d, i) => d.pr != null ? i : -1).filter(i => i >= 0);
+  const h = Math.floor(prDays.length / 2);
+  const segments = long && lt && prDays.length >= 30 ? [
+    { a: prDays[0], b: prDays[29], v: lt.pr_first30, label: `처음 30일 ${lt.pr_first30}` },
+    { a: prDays[h - 7], b: prDays[Math.min(h + 6, prDays.length - 1)], v: lt.pr_mid, label: `중간 ${lt.pr_mid}` },
+    { a: prDays[prDays.length - 7], b: prDays[prDays.length - 1], v: lt.pr_recent, label: `최근 7일 ${lt.pr_recent}` },
+  ] : [];
+  const segDays = new Set();
+  if (segments.length) {
+    prDays.slice(0, 30).forEach(i => segDays.add(i));
+    prDays.slice(h - 7, h + 7).forEach(i => segDays.add(i));
+    prDays.slice(-7).forEach(i => segDays.add(i));
+  }
+
+  if (long) {
+    panel(svgs.err, { lo: 0, hi: errMax * 1.12, fmt: v => v + "%", injLabel: true,
+      band: n >= 21 ? [n - 21, n - 1] : null, bandLabel: "판정 창 21일",
+      refs: [[8, "var(--faint)"], [thr, "var(--err)"]],
+      lines: [{ key: "day_error", color: "var(--faint)", noLine: true, dots: true, dotR: 1.8 },
+              { values: rollErr, color: "var(--accent)", width: 3 }] });
+    panel(svgs.pr, { lo: Math.min(0.6, ...prs) - 0.05, hi: Math.max(1.2, ...prs) + 0.05, fmt: v => v.toFixed(1),
+      zoneBelow: 0.75, refs: [[1, "var(--faint)"]], segments,
+      lines: [{ key: "pr", color: "var(--faint)", noLine: true, dots: true, dotR: 1.8, dotColorAt: i => segDays.has(i) ? "var(--seg)" : null },
+              { values: rollPr, color: "var(--accent)", width: 3 }] });
+    panel(svgs.kwh, { lo: 0, hi: Math.max(...rollAct.filter(v => v != null), ...rollExp.filter(v => v != null)) * 1.15, fmt: fmtKwh,
+      area: [rollAct, rollExp],
+      lines: [{ values: rollExp, color: "var(--accent)", dash: true }, { values: rollAct, color: "var(--ok)", width: 2.5 }] });
+  } else {
+    panel(svgs.err, { lo: 0, hi: errMax * 1.12, fmt: v => v + "%", injLabel: true,
+      refs: [[8, "var(--faint)"], [thr, "var(--err)"]],
+      lines: [{ key: "d1_error", color: "var(--warn)", dash: true },
+              { key: "day_error", color: "var(--accent)", dots: true,
+                dotColor: v => (thr != null && v > thr) ? "var(--err)" : v > 8 ? "var(--warn)" : null }] });
+    panel(svgs.pr, { lo: Math.min(0.6, ...prs) - 0.05, hi: Math.max(1.2, ...prs) + 0.05, fmt: v => v.toFixed(1),
+      band: n >= 7 ? [n - 7, n - 1] : null,
+      refs: [[1, "var(--faint)"], [0.75, "var(--err)"]],
+      lines: [{ key: "pr", color: "var(--accent)", dots: true, dotColor: v => v < 0.75 ? "var(--err)" : null }] });
+    panel(svgs.kwh, { lo: 0, hi: Math.max(...kwh) * 1.1, fmt: fmtKwh, area: ["actual_kwh", "expected_kwh"],
+      lines: [{ key: "expected_kwh", color: "var(--accent)", dash: true }, { key: "actual_kwh", color: "var(--ok)", dots: true }] });
+  }
+
+  // 공유 x축 크로스헤어 + 툴팁
+  const tip = el.querySelector(".dchart-tip");
+  const fmt = (v, suf = "", d = 2) => v == null ? "-" : Number(v).toFixed(d) + suf;
+  body.onmousemove = (ev) => {
+    const r = svgs.err.getBoundingClientRect();
+    const sx = (ev.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(n - 1, Math.round(n === 1 ? 0 : (sx - L) / ((W - L - R) / (n - 1)))));
+    const d = days[i], px = xOf(i);
+    for (const s of Object.values(svgs)) { const xh = s.querySelector(".xh"); xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.style.display = ""; }
+    const over = thr != null && d.day_error != null && d.day_error > thr;
+    tip.innerHTML = `<b>${d.date}${i === injIdx ? " · 주입 시작" : ""}</b>`
+      + `<div class="row"><span>일 오차율</span><span style="${over ? "color:var(--err)" : ""}">${fmt(d.day_error, "%")}</span></div>`
+      + `<div class="row"><span>d1 오차율</span><span>${fmt(d.d1_error, "%")}</span></div>`
+      + `<div class="row"><span>PR</span><span>${fmt(d.pr, "", 3)}</span></div>`
+      + `<div class="row"><span>실제</span><span>${fmt(d.actual_kwh, " kWh", 0)}</span></div>`
+      + `<div class="row"><span>기대</span><span>${fmt(d.expected_kwh, " kWh", 0)}</span></div>`
+      + `<div class="row"><span>예보 괴리</span><span>${fmt(d.forecast_gap, "%", 1)}</span></div>`
+      + (long ? `<div class="row"><span>21일 평균 오차</span><span>${fmt(rollErr[i], "%")}</span></div>`
+        + `<div class="row"><span>30일 평균 PR</span><span>${fmt(rollPr[i], "", 3)}</span></div>`
+        + `<div class="row"><span>7일 평균 실제/기대</span><span>${fmt(rollAct[i], "", 0)} / ${fmt(rollExp[i], " kWh", 0)}</span></div>` : "");
+    tip.style.display = "block";
+    const bx = body.getBoundingClientRect();
+    const left = ev.clientX - bx.left + 14;
+    tip.style.left = (left + tip.offsetWidth > bx.width ? ev.clientX - bx.left - tip.offsetWidth - 14 : left) + "px";
+    tip.style.top = Math.max(0, ev.clientY - bx.top - tip.offsetHeight / 2) + "px";
+  };
+  body.onmouseleave = () => {
+    tip.style.display = "none";
+    for (const s of Object.values(svgs)) s.querySelector(".xh").style.display = "none";
+  };
+}
+let _dchartResize = null;
+window.addEventListener("resize", () => {
+  clearTimeout(_dchartResize);
+  _dchartResize = setTimeout(() => {
+    if (DCHART.runs.length && document.getElementById("drift-chart").classList.contains("show")) renderDriftChart();
+    if (FC && document.getElementById("fc-chart").classList.contains("show")) renderForecastChart();
+  }, 150);
+});
 
 /* ===================== 초기화 ===================== */
 async function refreshHealth() {
@@ -475,6 +991,7 @@ function toggleTheme() { applyTheme(document.documentElement.dataset.theme === "
 async function init() {
   renderPipeline();
   loadLogFiles();
+  loadForecastPlants();
   refreshHealth();
   setInterval(refreshHealth, 5000);
 }

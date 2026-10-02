@@ -139,3 +139,26 @@ def test_batch_test_requires_history_plus_one_day():
     recs = [HourRecord(time=k, generation_kwh=0) for k in hour_keys(date(2026, 8, 11))]
     with pytest.raises(ValidationError):
         BatchTestRequest(plant_id="p", records=recs)
+
+
+# ---------------------------------------------------------------- 예측 카드용 기상 조회 (/data/weather)
+def test_day_weather_restores_units_and_aligns_hour_end():
+    from data.features import WEATHER_SCALE
+    from serving_app.routers.data import day_weather
+    from serving_app.schemas import HourWeather
+
+    norm = lambda ghi, cc, t: [ghi / WEATHER_SCALE["shortwave_radiation"], cc / WEATHER_SCALE["cloud_cover"], t / WEATHER_SCALE["temperature_2m"]]
+    wloc = {f"2026-08-11T{h:02d}:00": norm(500, 20, 30) for h in range(1, 24)}
+    wloc["2026-08-12T00:00"] = norm(0, 80, 25)          # D 24:00 = 다음날 T00:00
+    out = day_weather(date(2026, 8, 11), wloc)
+    assert len(out) == 24 and out[0] == {"ghi": 500.0, "cloud_cover": 20.0, "temperature": 30.0}
+    assert out[-1] == {"ghi": 0.0, "cloud_cover": 80.0, "temperature": 25.0}
+    HourWeather(**out[0])                                # /predict forecast 로 그대로 넣을 수 있는 형태
+
+
+def test_day_weather_marks_missing_hours_none():
+    from serving_app.routers.data import day_weather
+
+    wloc = {"2026-08-11T01:00": [0.1, 0.2, float("nan")]}  # nan 도 결측
+    out = day_weather(date(2026, 8, 11), wloc)
+    assert out.count(None) == 24
