@@ -1,0 +1,3 @@
+HAIC_Predictor v1  stage=Production  rmse=2.03  params={'mode': 'scratch', 'epochs': '100'}
+HAIC_Predictor v2  stage=Production  rmse=1.47  params={'mode': 'fine-tune', 'epochs': '10', 'n_rows': '41'}
+HAIC_Predictor v3  stage=Production  rmse=1.69  params={'mode': 'fine-tune', 'epochs': '10', 'n_rows': '41'}

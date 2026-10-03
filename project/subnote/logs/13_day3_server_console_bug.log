@@ -1,0 +1,14 @@
+INFO:     Started server process [12141]
+INFO:     Waiting for application startup.
+/home/user/model-serving/project/serving_app/model_loader.py:134: FutureWarning: ``mlflow.tracking.client.MlflowClient.get_latest_versions`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+[eager] model loaded in 4.697s at startup
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[WARN] drift detected - triggering retrain
+[INFO] retrain triggered (window=last_21_days)
+Registered model 'HAIC_Predictor' already exists. Creating a new version of this model...
+2026/10/03 12:38:03 WARNING mlflow.tracking._model_registry.fluent: Run with id 91d1c98069fa4ad9aaa4a2db7727a448 has no artifacts at artifact path 'model', registering model based on models:/m-d6e729528bd948c995aeb884d4007861 instead
+Created version '2' of model 'HAIC_Predictor'.
+/home/user/model-serving/project/serving_app/train_and_register.py:62: FutureWarning: ``mlflow.tracking.client.MlflowClient.transition_model_version_stage`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+[GATE PASSED] rmse=1.47 -> HAIC_Predictor v2 promoted to Production
+[OK] new_rmse=1.47 - production promoted: HAIC_Predictor v2

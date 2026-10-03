@@ -1,0 +1,17 @@
+INFO:     Started server process [13053]
+INFO:     Waiting for application startup.
+/home/user/model-serving/project/serving_app/model_loader.py:134: FutureWarning: ``mlflow.tracking.client.MlflowClient.get_latest_versions`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+[eager] model loaded in 4.824s at startup
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+[WARN] drift detected - triggering retrain
+[INFO] retrain triggered (window=last_21_days)
+Registered model 'HAIC_Predictor' already exists. Creating a new version of this model...
+2026/10/03 12:38:38 WARNING mlflow.tracking._model_registry.fluent: Run with id 259d7b2838c2499faebe30b84d6b0dd3 has no artifacts at artifact path 'model', registering model based on models:/m-ab8a0392b1954af995acf1f9ad01f55e instead
+Created version '3' of model 'HAIC_Predictor'.
+/home/user/model-serving/project/serving_app/train_and_register.py:62: FutureWarning: ``mlflow.tracking.client.MlflowClient.transition_model_version_stage`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+[GATE PASSED] rmse=1.69 -> HAIC_Predictor v3 promoted to Production
+[OK] new_rmse=1.69 - production promoted: HAIC_Predictor v3
+/home/user/model-serving/project/serving_app/model_loader.py:134: FutureWarning: ``mlflow.tracking.client.MlflowClient.get_latest_versions`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+[lazy] model loaded in 0.140s on first request
+WARNING:tensorflow:5 out of the last 48 calls to <function TensorFlowTrainer.make_predict_function.<locals>.one_step_on_data_distributed at 0x7f75c3ff3560> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.

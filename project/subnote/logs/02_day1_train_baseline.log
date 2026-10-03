@@ -1,3 +1,6 @@
 scaler fit on 756행 -> serving_app/models/scaler.pkl
-baseline v1 RMSE = 2.41  (배포 게이트: $4.00)
+baseline v1 RMSE = 2.43  (배포 게이트: $4.00)
 saved -> serving_app/models/haic_v1.keras
+real	0m38.351s
+user	1m1.878s
+sys	0m8.052s

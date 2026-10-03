@@ -2,5 +2,8 @@
 [2] 정상 입력 테스트 전송...
 [normal] drift_check = {'status': 'ok'}
 [3-4] 드리프트 입력 생성·주입...
-[drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True, 'rmse': 1.4685567832433037}
+[drift_injection] drift_check = {'status': 'retrain_triggered', 'promoted': True, 'rmse': 1.6885267127529455}
 [5] 결과 확인: requests.log 또는 서버 콘솔에서 [WARN] drift detected 로그를 확인하세요.
+real	0m13.535s
+user	0m0.511s
+sys	0m0.035s

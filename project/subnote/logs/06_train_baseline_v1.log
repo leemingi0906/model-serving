@@ -1,7 +1,0 @@
-$ python scripts/train_baseline_v1.py
-scaler fit on 756행 -> serving_app/models/scaler.pkl
-baseline v1 RMSE = 2.87  (배포 게이트: $4.00)
-saved -> serving_app/models/haic_v1.keras
-real 15.43
-user 13.12
-sys 1.33

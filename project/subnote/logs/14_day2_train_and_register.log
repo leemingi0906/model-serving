@@ -1,6 +1,0 @@
-2026/10/01 02:53:25 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
-2026/10/01 02:53:25 INFO mlflow.store.db.utils: Updating database tables
-Successfully registered model 'HAIC_Predictor'.
-2026/10/01 02:54:33 WARNING mlflow.tracking._model_registry.fluent: Run with id acf96183e116471695062d5fbc215f92 has no artifacts at artifact path 'model', registering model based on models:/m-68e1f02e33f440a192b42f4746c889e1 instead
-Created version '1' of model 'HAIC_Predictor'.
-[GATE PASSED] rmse=2.03 -> HAIC_Predictor v1 promoted to Production

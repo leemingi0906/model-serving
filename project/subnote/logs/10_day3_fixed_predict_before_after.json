@@ -1,0 +1,4 @@
+# 재기동 직후 (v2)
+{"predicted_close":195.19,"model_version":"production-v2"}
+# 드리프트 → v3 승격 뒤, 같은 요청, 재시작 없음
+{"predicted_close":194.22,"model_version":"production-v3"}

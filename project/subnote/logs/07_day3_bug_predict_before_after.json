@@ -1,0 +1,4 @@
+# 재학습 전 (v1)
+{"predicted_close":194.21,"model_version":"production-v1"}
+# [OK] promoted v2 로그 뒤, 같은 요청 (캐시 안 비움)
+{"predicted_close":194.21,"model_version":"production-v1"}

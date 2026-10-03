@@ -1,4 +1,0 @@
-# Day2: MODEL_SOURCE=mlflow /predict
-{"predicted_close":166.26,"model_version":"production-v1"}
-# Day3: after drift -> fine-tune -> promote, same request
-{"predicted_close":167.14,"model_version":"production-v2"}

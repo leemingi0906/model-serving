@@ -1,0 +1,11 @@
+2026/10/03 12:36:46 INFO mlflow.store.db.utils: Creating initial MLflow database tables...
+2026/10/03 12:36:46 INFO mlflow.store.db.utils: Updating database tables
+Successfully registered model 'HAIC_Predictor'.
+2026/10/03 12:37:26 WARNING mlflow.tracking._model_registry.fluent: Run with id 4efe6ad4598f4159bf44113d36c57937 has no artifacts at artifact path 'model', registering model based on models:/m-237c4ae368ee453d8eff6cb59305cb26 instead
+Created version '1' of model 'HAIC_Predictor'.
+/home/user/model-serving/project/serving_app/train_and_register.py:62: FutureWarning: ``mlflow.tracking.client.MlflowClient.transition_model_version_stage`` is deprecated since 2.9.0. Model registry stages will be removed in a future major release. To learn more about the deprecation of model registry stages, see our migration guide here: https://mlflow.org/docs/latest/model-registry.html#migrating-from-stages
+  MlflowClient().transition_model_version_stage(name=MODEL_NAME, version=v.version, stage="Production")
+[GATE PASSED] rmse=2.03 -> HAIC_Predictor v1 promoted to Production
+real	0m47.015s
+user	1m9.902s
+sys	0m8.721s
